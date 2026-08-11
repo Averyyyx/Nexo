@@ -1,0 +1,48 @@
+appId: com.vencord.app
+productName: Vencord
+copyright: Copyright © 2026 Vencord
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - "package.json"
+  - "server.js"
+  - "electron/**/*"
+  - "public/**/*"
+  - "node_modules/**/*"
+  - "!node_modules/**/{test,tests,__tests__,docs,example,examples}/**"
+
+asar: true
+asarUnpack:
+  - "server.js"
+  - "**/node_modules/better-sqlite3/**/*"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: "${productName}-${version}-Setup.${ext}"
+  signAndEditExecutable: false
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Vencord
+
+extraMetadata:
+  main: electron/main.js
+
+extraResources:
+  - from: build/runtime
+    to: runtime
+    filter:
+      - "**/*"
+
+npmRebuild: false
+buildDependenciesFromSource: false
