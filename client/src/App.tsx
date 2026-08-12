@@ -195,7 +195,7 @@ export default function App() {
       >
         <div className="brand">
           <span className="pulse-dot" />
-          <strong>Vencord</strong>
+          <strong>Nexo</strong>
           <span className="tagline">new era of presence</span>
         </div>
         <div className="nav-actions">
@@ -297,7 +297,7 @@ export default function App() {
                       <div className="flex-1 flex items-center justify-center text-gray-400">
                         <div className="text-center">
                           <div className="text-6xl mb-4">👋</div>
-                          <h3 className="text-xl font-semibold mb-2">Добро пожаловать в Vencord!</h3>
+                          <h3 className="text-xl font-semibold mb-2">Добро пожаловать в Nexo!</h3>
                           <p className="max-w-md">
                             Выберите друга, чтобы начать общение или создать голосовой канал.
                           </p>

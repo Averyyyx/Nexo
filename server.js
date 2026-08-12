@@ -57,7 +57,7 @@ const ALLOWED_EXTENSIONS = new Set(
 const PASSWORD_MIN_SCORE = Number(process.env.PASSWORD_MIN_SCORE || 3);
 const REQUIRE_HTTPS = process.env.REQUIRE_HTTPS === 'true';
 const isProduction = process.env.NODE_ENV === 'production';
-const PREMIUM_BRAND = process.env.PREMIUM_BRAND || 'Vencord Pulse';
+const PREMIUM_BRAND = process.env.PREMIUM_BRAND || 'Nexo Pulse';
 const PREMIUM_BALANCE_TOKEN = process.env.PREMIUM_BALANCE_TOKEN || '';
 
 const useMemorySession = process.env.USE_MEMORY_SESSION === 'true' || process.env.ELECTRON_DESKTOP === '1';
@@ -929,7 +929,7 @@ const io = new Server(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production'
       ? process.env.CLIENT_ORIGIN
-      : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:4000'],
+      : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:4000', 'https://nexo.com'],
     methods: ['GET', 'POST'],
     credentials: true
   },

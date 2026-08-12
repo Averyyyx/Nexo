@@ -1,5 +1,5 @@
 {
-  "name": "vencord",
+  "name": "nexo",
   "version": "1.0.0",
   "description": "Next-gen Discord-style messenger prototype",
   "main": "electron/main.js",

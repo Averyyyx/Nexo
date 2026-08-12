@@ -6,7 +6,10 @@ const http = require('http');
 let mainWindow = null;
 let serverProcess = null;
 const SERVER_PORT = process.env.PORT || 4000;
-const SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`;
+// Используем внешний домен для production, localhost для разработки
+const SERVER_URL = process.env.NODE_ENV === 'production' 
+  ? 'https://nexo.com' 
+  : `http://127.0.0.1:${SERVER_PORT}`;
 
 function waitForServer(maxAttempts = 60, intervalMs = 500) {
   return new Promise((resolve, reject) => {
@@ -75,7 +78,7 @@ function startServer() {
       USE_MEMORY_SESSION: 'true',
       PORT: String(SERVER_PORT),
       NODE_ENV: 'production',
-      CLIENT_ORIGIN: SERVER_URL,
+      CLIENT_ORIGIN: process.env.NODE_ENV === 'production' ? 'https://nexo.com' : SERVER_URL,
       SESSION_SECRET: process.env.SESSION_SECRET || 'vencord-desktop-session',
       JWT_SECRET: process.env.JWT_SECRET || 'vencord-desktop-jwt',
       DATA_DIR: userDataDir,
@@ -104,7 +107,7 @@ function createWindow() {
       contextIsolation: true,
       webSecurity: true
     },
-    title: 'Vencord',
+    title: 'Nexo',
     show: false,
     backgroundColor: '#1e1e1e'
   });

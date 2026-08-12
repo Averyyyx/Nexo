@@ -1,6 +1,6 @@
-appId: com.vencord.app
-productName: Vencord
-copyright: Copyright © 2026 Vencord
+appId: com.nexo.app
+productName: Nexo
+copyright: Copyright © 2026 Nexo
 
 directories:
   output: dist
@@ -33,7 +33,7 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Vencord
+  shortcutName: Nexo
 
 extraMetadata:
   main: electron/main.js

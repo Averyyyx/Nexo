@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  nexo:
+    build: .
+    container_name: nexo-app
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - USE_MEMORY_SESSION=true
+      - CLIENT_ORIGIN=https://nexo.com
+      - CORS_ORIGIN=https://nexo.com
+      - SESSION_SECRET=${SESSION_SECRET:-change-this-in-production}
+      - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+      - ./tmp:/app/tmp
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4000/api/auth/session"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
