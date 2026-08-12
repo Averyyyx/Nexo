@@ -176,6 +176,18 @@ function startServer() {
 
   serverProcess.on('exit', (code, signal) => {
     console.log(`Server process exited with code ${code} and signal ${signal}`);
+    if (code !== 0) {
+      console.error('Server crashed! Exit code:', code);
+    }
+  });
+  
+  // Логируем stdout и stderr от сервера
+  serverProcess.stdout?.on('data', (data) => {
+    console.log('[Server stdout]', data.toString());
+  });
+  
+  serverProcess.stderr?.on('data', (data) => {
+    console.error('[Server stderr]', data.toString());
   });
   
   console.log('Server process started with PID:', serverProcess.pid);
