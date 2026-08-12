@@ -38,7 +38,26 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 4000;
 const dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
-const publicDir = path.join(__dirname, 'public');
+
+// Определяем publicDir правильно для packaged app
+let publicDir;
+if (process.env.ELECTRON_DESKTOP === '1') {
+  // В Electron ищем public рядом с server.js
+  publicDir = path.join(__dirname, 'public');
+} else {
+  // В обычном режиме
+  publicDir = path.join(__dirname, 'public');
+}
+
+// Логируем путь к publicDir
+console.log('Public directory path:', publicDir);
+console.log('Public directory exists:', fs.existsSync(publicDir));
+
+if (!fs.existsSync(publicDir)) {
+  console.error('ERROR: Public directory does not exist:', publicDir);
+  console.error('Current working directory:', process.cwd());
+  console.error('__dirname:', __dirname);
+}
 const uploadsDir = path.join(dataDir, 'uploads');
 const tempUploadsDir = path.join(dataDir, 'tmp');
 const ALLOWED_MIME_TYPES = new Set(
@@ -2743,7 +2762,26 @@ app.get('*', (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Auth service listening on http://localhost:${PORT}`);
+  console.log(`Public directory: ${publicDir}`);
+  console.log(`Data directory: ${dataDir}`);
   if (!githubReady) {
     console.warn('GitHub OAuth is disabled. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to enable it.');
   }
+});
+
+// Обработка ошибок сервера
+server.on('error', (error) => {
+  console.error('Server error:', error);
+  process.exit(1);
+});
+
+// Обработка неперехваченных ошибок
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled rejection at:', promise, 'reason:', reason);
+  process.exit(1);
 });
