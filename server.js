@@ -779,7 +779,7 @@ if (!defaultPlan) {
   );
 }
 
-const allowedOrigins = (process.env.CLIENT_ORIGIN || '')
+const allowedOrigins = (process.env.CLIENT_ORIGIN || process.env.CORS_ORIGIN || '')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
@@ -893,7 +893,19 @@ const csrfProtection = csrf({
   cookie: false,
   ignoreMethods: ['GET', 'HEAD', 'OPTIONS']
 });
-app.use(csrfProtection);
+
+// Применяем CSRF middleware, но делаем исключение для API в разработке и Electron
+app.use((req, res, next) => {
+  const isDev = process.env.NODE_ENV === 'development';
+  const isElectron = process.env.ELECTRON_DESKTOP === '1';
+  
+  if ((isDev || isElectron) && req.path.startsWith('/api/')) {
+    // В разработке и Electron для API пропускаем CSRF, но добавляем фейковый метод csrfToken
+    req.csrfToken = () => isElectron ? 'electron-csrf-token' : 'dev-csrf-token';
+    return next();
+  }
+  return csrfProtection(req, res, next);
+});
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -915,9 +927,9 @@ const upload = multer({
 // Initialize Socket.IO after session middleware
 const io = new Server(server, {
   cors: {
-    origin: process.env.NODE_ENV === 'production' 
-      ? process.env.CLIENT_ORIGIN 
-      : ['http://localhost:3000', 'http://localhost:5173'],
+    origin: process.env.NODE_ENV === 'production'
+      ? process.env.CLIENT_ORIGIN
+      : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:4000'],
     methods: ['GET', 'POST'],
     credentials: true
   },
@@ -1462,7 +1474,16 @@ function broadcastVoiceState(channelId) {
 }
 
 app.get('/api/security/csrf-token', (req, res) => {
-  res.json({ token: req.csrfToken() });
+  // В режиме разработки CSRF отключен для API, возвращаем фиктивный токен
+  if (process.env.NODE_ENV === 'development') {
+    return res.json({ token: 'dev-csrf-token-disabled' });
+  }
+  // В production используем реальный CSRF токен
+  if (typeof req.csrfToken === 'function') {
+    res.json({ token: req.csrfToken() });
+  } else {
+    res.json({ token: 'csrf-not-available' });
+  }
 });
 
 function ensureConversationAccess(conversationId, userId) {

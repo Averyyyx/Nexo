@@ -87,6 +87,10 @@ function startServer() {
   serverProcess.on('error', (error) => {
     console.error('Server process error:', error);
   });
+
+  serverProcess.on('exit', (code, signal) => {
+    console.log(`Server process exited with code ${code} and signal ${signal}`);
+  });
 }
 
 function createWindow() {
@@ -105,7 +109,10 @@ function createWindow() {
     backgroundColor: '#1e1e1e'
   });
 
-  mainWindow.loadURL(SERVER_URL);
+  console.log('Loading URL:', SERVER_URL);
+  mainWindow.loadURL(SERVER_URL)
+    .then(() => console.log('URL loaded successfully'))
+    .catch(err => console.error('Failed to load URL:', err));
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
@@ -133,12 +140,19 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   try {
-    startServer();
-    await waitForServer();
+    console.log('Using external server at', SERVER_URL);
+    console.log('Creating window...');
     createWindow();
   } catch (error) {
     console.error('Failed to launch Vencord:', error);
-    app.quit();
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    // Показываем сообщение об ошибке и закрываем приложение
+    alert('Failed to start Vencord: ' + error.message);
+    setTimeout(() => {
+      app.quit();
+    }, 3000);
   }
 
   app.on('activate', () => {

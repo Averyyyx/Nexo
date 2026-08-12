@@ -5,6 +5,7 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "node server.js",
+    "dev:client": "cd client && npm run dev",
     "start": "electron .",
     "test": "node server.js --check-config",
     "build:client": "npm run build --prefix client",

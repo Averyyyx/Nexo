@@ -76,7 +76,8 @@ export function LoginPanel({ theme, onSuccess }: LoginPanelProps) {
         label: 'Continue with GitHub',
         icon: Github,
         href: `${apiBase}/api/auth/github`,
-        accent: 'github' as const
+        accent: 'github' as const,
+        disabled: false // Можно добавить проверку доступности OAuth
       }
     ],
     [apiBase]
@@ -181,6 +182,12 @@ export function LoginPanel({ theme, onSuccess }: LoginPanelProps) {
             rel="noreferrer"
             whileHover={{ y: -2 }}
             whileTap={{ scale: 0.98 }}
+            onClick={(e) => {
+              if (provider.disabled) {
+                e.preventDefault();
+                alert('GitHub OAuth не настроен. Пожалуйста, настройте GITHUB_CLIENT_ID и GITHUB_CLIENT_SECRET в .env файле');
+              }
+            }}
           >
             <provider.icon size={18} />
             {provider.label}
