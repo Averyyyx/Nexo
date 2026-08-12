@@ -17,6 +17,7 @@ files:
 asar: true
 asarUnpack:
   - "server.js"
+  - "public/**/*"
   - "**/node_modules/better-sqlite3/**/*"
 
 win:
