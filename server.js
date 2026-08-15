@@ -1,7 +1,13 @@
 require('dotenv').config();
 
-if (!process.env.SESSION_SECRET) process.env.SESSION_SECRET = 'vencord-desktop-session';
-if (!process.env.JWT_SECRET) process.env.JWT_SECRET = 'vencord-desktop-jwt';
+if (!process.env.SESSION_SECRET) {
+  console.warn('WARNING: Using default SESSION_SECRET. Set SESSION_SECRET in production!');
+  process.env.SESSION_SECRET = 'nexo-desktop-session-secret-change-in-production';
+}
+if (!process.env.JWT_SECRET) {
+  console.warn('WARNING: Using default JWT_SECRET. Set JWT_SECRET in production!');
+  process.env.JWT_SECRET = 'nexo-desktop-jwt-secret-change-in-production';
+}
 if (!process.env.CLIENT_ORIGIN) process.env.CLIENT_ORIGIN = 'http://localhost:4000';
 if (!process.env.NODE_ENV) process.env.NODE_ENV = 'production';
 
@@ -37,7 +43,16 @@ require('dotenv').config();
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 4000;
-const dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
+
+// Определяем dataDir правильно для packaged Electron app
+let dataDir;
+if (process.env.ELECTRON_DESKTOP === '1') {
+  // В Electron используем userData
+  const { app: electronApp } = require('electron');
+  dataDir = process.env.DATA_DIR || path.join(electronApp.getPath('userData'), 'data');
+} else {
+  dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
+}
 
 // Определяем publicDir правильно для packaged app
 let publicDir;
@@ -212,7 +227,7 @@ if (!fs.existsSync(tempUploadsDir)) {
   fs.mkdirSync(tempUploadsDir, { recursive: true });
 }
 
-const db = new Database(process.env.DB_PATH || path.join(dataDir, 'app.db'));
+const db = new Database(process.env.DB_PATH || path.join(dataDir, 'nexo.db'));
 db.pragma('journal_mode = WAL');
 
 db.prepare(`
@@ -803,7 +818,7 @@ const allowedOrigins = (process.env.CLIENT_ORIGIN || process.env.CORS_ORIGIN || 
   .map((origin) => origin.trim())
   .filter(Boolean);
 
-// Добавляем localhost для Electron приложения
+// Добавляем localhost и 127.0.0.1 для Electron приложения
 if (!allowedOrigins.includes('http://localhost:4000')) {
   allowedOrigins.push('http://localhost:4000');
 }
@@ -897,9 +912,9 @@ const sessionConfig = {
     ? new session.MemoryStore()
     : new RedisStore({
         client: redisClient,
-        prefix: process.env.SESSION_PREFIX || 'vencord:sess:'
+        prefix: process.env.SESSION_PREFIX || 'nexo:sess:'
       }),
-  secret: process.env.SESSION_SECRET || 'dev-secret-change-me',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   rolling: true,
@@ -956,7 +971,7 @@ const io = new Server(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production'
       ? process.env.CLIENT_ORIGIN
-      : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:4000', 'https://nexo.com'],
+      : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:4000', 'http://127.0.0.1:4000'],
     methods: ['GET', 'POST'],
     credentials: true
   },

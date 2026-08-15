@@ -255,9 +255,6 @@
             ipcRenderer.send('close-window');
         });
         
-        // Получаем версию приложения
-        const { ipcRenderer } = require('electron');
-        
         const statusText = document.getElementById('statusText');
         const versionText = document.getElementById('versionText');
 
@@ -273,8 +270,8 @@
             
             while (attempts < maxAttempts) {
                 try {
-                    // Используем localhost вместо 127.0.0.1 для лучшей совместимости с VPN
-                    const response = await fetch('http://localhost:4000/api/auth/status', {
+                    // Используем 127.0.0.1 для стабильности
+                    const response = await fetch('http://127.0.0.1:4000/api/auth/status', {
                         mode: 'cors',
                         cache: 'no-cache',
                         timeout: 5000
@@ -290,14 +287,14 @@
                         statusText.textContent = 'Добро пожаловать!';
                         setTimeout(() => {
                             // Перенаправляем в чаты
-                            window.location.href = 'http://localhost:4000/chats';
+                            window.location.href = 'http://127.0.0.1:4000/chats';
                         }, 1000);
                         return;
                     } else {
                         statusText.textContent = 'Вход в систему...';
                         setTimeout(() => {
                             // Перенаправляем на регистрацию
-                            window.location.href = 'http://localhost:4000';
+                            window.location.href = 'http://127.0.0.1:4000';
                         }, 1000);
                         return;
                     }

@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist_*/
 build/
 release/
 
@@ -15,9 +16,22 @@ release/
 *.pak
 *.dat
 *.asar
+*.blockmap
+*.yml
 
 .vscode/
 .idea/
 
 data/
 uploads/
+logs/
+
+# Generated Electron files
+snapshot_blob.bin
+v8_context_snapshot.bin
+vk_swiftshader_icd.json
+chrome_*.pak
+icudtl.dat
+resources.pak
+LICENSE.electron.txt
+LICENSES.chromium.html

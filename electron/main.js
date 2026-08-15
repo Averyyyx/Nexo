@@ -12,8 +12,8 @@ let notificationCount = 0;
 const SERVER_PORT = process.env.PORT || 4000;
 
 // ВАЖНО: Electron должен всегда использовать локальный сервер
-// Используем localhost для лучшей совместимости с VPN
-const SERVER_URL = `http://localhost:${SERVER_PORT}`;
+// Используем 127.0.0.1 для стабильности
+const SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`;
 
 // Функция логирования (инициализируется внутри app.whenReady)
 let logFile = null;
@@ -97,6 +97,22 @@ function getIconPath(iconName) {
   }
 }
 
+function getIconPathAny(iconName) {
+  const pngPath = getIconPath(iconName);
+  if (fs.existsSync(pngPath)) {
+    return pngPath;
+  }
+  // Try other extensions
+  const extensions = ['.png', '.ico', '.svg'];
+  for (const ext of extensions) {
+    const tryPath = pngPath.replace('.png', ext);
+    if (fs.existsSync(tryPath)) {
+      return tryPath;
+    }
+  }
+  return pngPath; // fallback
+}
+
 function getTrayIconPath() {
   const iconName = notificationCount > 0 ? 'nexo-ico-mini-ping' : 'nexo-ico-mini';
   return getIconPath(iconName);
@@ -172,40 +188,42 @@ function createTray() {
   console.log('System tray created');
 }
 
-// IPC handlers
-ipcMain.on('set-notification-count', (event, count) => {
-  setNotificationCount(count);
-  // Отправляем уведомление обратно в renderer
-  if (mainWindow) {
-    mainWindow.webContents.send('notification-updated', count);
-  }
-});
-
-ipcMain.on('minimize-window', () => {
-  if (mainWindow) {
-    mainWindow.minimize();
-  }
-});
-
-ipcMain.on('maximize-window', () => {
-  if (mainWindow) {
-    if (mainWindow.isMaximized()) {
-      mainWindow.unmaximize();
-    } else {
-      mainWindow.maximize();
+// IPC handlers (will be registered inside app.whenReady)
+function setupIPCHandlers() {
+  ipcMain.on('set-notification-count', (event, count) => {
+    setNotificationCount(count);
+    // Отправляем уведомление обратно в renderer
+    if (mainWindow) {
+      mainWindow.webContents.send('notification-updated', count);
     }
-  }
-});
+  });
 
-ipcMain.on('close-window', () => {
-  if (mainWindow) {
-    mainWindow.close();
-  }
-});
+  ipcMain.on('minimize-window', () => {
+    if (mainWindow) {
+      mainWindow.minimize();
+    }
+  });
 
-ipcMain.handle('get-app-version', () => {
-  return app.getVersion();
-});
+  ipcMain.on('maximize-window', () => {
+    if (mainWindow) {
+      if (mainWindow.isMaximized()) {
+        mainWindow.unmaximize();
+      } else {
+        mainWindow.maximize();
+      }
+    }
+  });
+
+  ipcMain.on('close-window', () => {
+    if (mainWindow) {
+      mainWindow.close();
+    }
+  });
+
+  ipcMain.handle('get-app-version', () => {
+    return app.getVersion();
+  });
+}
 
 function updateTrayIcon() {
   if (!tray) return;
@@ -241,52 +259,20 @@ function checkForUpdates() {
     splashWindow.webContents.send('loading-status', 'Проверка обновлений...');
   }
   
-  // Симуляция проверки обновлений
+  // Заглушка для обновлений - в реальном приложении здесь будет настоящая проверка
   setTimeout(() => {
-    const hasUpdate = Math.random() > 0.5; // 50% шанс обновления для демо
-    
-    if (hasUpdate) {
-      console.log('Update available!');
-      if (splashWindow) {
-        splashWindow.webContents.send('update-available', '1.0.1');
-      }
-      
-      // Симуляция загрузки обновления
-      let progress = 0;
-      const updateInterval = setInterval(() => {
-        progress += 10;
-        if (splashWindow) {
-          splashWindow.webContents.send('update-progress', progress);
-        }
-        
-        if (progress >= 100) {
-          clearInterval(updateInterval);
-          if (splashWindow) {
-            splashWindow.webContents.send('update-complete');
-            splashWindow.webContents.send('loading-status', 'Загрузка...');
-          }
-        }
-      }, 300);
-    } else {
-      console.log('No updates available');
-      if (splashWindow) {
-        splashWindow.webContents.send('loading-status', 'Загрузка...');
-      }
+    console.log('No updates available');
+    if (splashWindow) {
+      splashWindow.webContents.send('loading-status', 'Загрузка...');
     }
-  }, 1000);
+  }, 500);
 }
 
 function getServerRuntime() {
-  if (!app.isPackaged) {
-    return {
-      execPath: process.execPath,
-      useElectronAsNode: true
-    };
-  }
-
+  // В обоих режимах используем Electron как Node runtime
   return {
-    execPath: path.join(process.resourcesPath, 'runtime', 'node.exe'),
-    useElectronAsNode: false
+    execPath: process.execPath,
+    useElectronAsNode: true
   };
 }
 
@@ -525,9 +511,13 @@ function createWindow() {
   });
 }
 
+// Инициализация приложения Electron
 app.whenReady().then(async () => {
   // Инициализируем логирование после того, как app готов
   setupLogging();
+  
+  // Регистрируем IPC handlers
+  setupIPCHandlers();
   
   try {
     console.log('=== Nexo Electron App Starting ===');

@@ -5,7 +5,7 @@ export const API_BASE = (() => {
                        navigator.userAgent.toLowerCase().indexOf('electron') > -1;
   
   if (isElectron) {
-    return 'http://127.0.0.1:4000';
+    return 'http://localhost:4000';
   }
   
   return import.meta.env.VITE_API_BASE || 'http://localhost:4000';

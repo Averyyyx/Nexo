@@ -3,7 +3,7 @@ productName: Nexo
 copyright: Copyright © 2026 Nexo
 
 directories:
-  output: dist_final
+  output: dist
   buildResources: build
 
 files:
@@ -18,7 +18,7 @@ asar: true
 asarUnpack:
   - "server.js"
   - "public/**/*"
-  - "electron/icons/**/*"
+  - "electron/**/*"
   - "**/node_modules/better-sqlite3/**/*"
 
 win:
@@ -28,7 +28,7 @@ win:
         - x64
   artifactName: "${productName}-${version}-Setup.${ext}"
   signAndEditExecutable: false
-  icon: "electron/icons/Nexo-Desctop-ico-512.png"
+  icon: "electron/icons/Nexo-Desctop-ico-256.png"
 
 nsis:
   oneClick: false
@@ -40,12 +40,6 @@ nsis:
 
 extraMetadata:
   main: electron/main.js
-
-extraResources:
-  - from: build/runtime
-    to: runtime
-    filter:
-      - "**/*"
 
 npmRebuild: false
 buildDependenciesFromSource: false
