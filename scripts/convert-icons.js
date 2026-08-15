@@ -11,7 +11,7 @@ if (!fs.existsSync(outputDir)) {
 }
 
 // Размеры для иконок
-const sizes = [16, 32, 48, 64, 128, 256];
+const sizes = [16, 32, 48, 64, 128, 256, 512];
 
 // Функция для конвертации SVG в PNG
 async function convertSvgToPng(svgPath, outputPath, size) {

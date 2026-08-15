@@ -45,7 +45,8 @@
 
         /* Анимация вращения молекул по орбитам SVG */
         .logo-svg circle {
-            animation: pulse 2s ease-in-out infinite;
+            animation: orbit 4s linear infinite;
+            transform-origin: center;
         }
 
         .logo-svg circle:nth-child(7) {
@@ -53,21 +54,19 @@
         }
 
         .logo-svg circle:nth-child(8) {
-            animation-delay: 0.7s;
+            animation-delay: 1.3s;
         }
 
         .logo-svg circle:nth-child(9) {
-            animation-delay: 1.4s;
+            animation-delay: 2.6s;
         }
 
-        @keyframes pulse {
-            0%, 100% {
-                opacity: 0.6;
-                transform: scale(1);
+        @keyframes orbit {
+            0% {
+                transform: rotate(0deg) translateX(60px) rotate(0deg);
             }
-            50% {
-                opacity: 1;
-                transform: scale(1.2);
+            100% {
+                transform: rotate(360deg) translateX(60px) rotate(-360deg);
             }
         }
 

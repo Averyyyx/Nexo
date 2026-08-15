@@ -106,13 +106,22 @@ function createTray() {
   console.log('Creating system tray...');
   
   const trayIconPath = getTrayIconPath();
-  const trayImage = nativeImage.createFromPath(trayIconPath);
+  console.log('Tray icon path:', trayIconPath);
   
-  tray = new Tray(trayImage);
+  // Проверяем существование файла иконки
+  if (!fs.existsSync(trayIconPath)) {
+    console.error('Tray icon not found:', trayIconPath);
+    // Используем встроенную иконку если файл не найден
+    tray = new Tray(nativeImage.createEmpty());
+  } else {
+    const trayImage = nativeImage.createFromPath(trayIconPath);
+    tray = new Tray(trayImage);
+  }
   
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Открыть Nexo',
+      label: 'Nexo',
+      icon: nativeImage.createFromPath(getIconPath('Nexo-Desctop-ico')),
       click: () => {
         if (mainWindow) {
           mainWindow.show();
@@ -120,10 +129,20 @@ function createTray() {
         }
       }
     },
+    { type: 'separator' },
     {
       label: 'Проверить обновления',
       click: () => {
         checkForUpdates();
+      }
+    },
+    {
+      label: 'О программе',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        }
       }
     },
     { type: 'separator' },

@@ -3,7 +3,7 @@ productName: Nexo
 copyright: Copyright © 2026 Nexo
 
 directories:
-  output: dist_updated
+  output: dist_final
   buildResources: build
 
 files:
@@ -28,7 +28,7 @@ win:
         - x64
   artifactName: "${productName}-${version}-Setup.${ext}"
   signAndEditExecutable: false
-  icon: "electron/icons/Nexo-Desctop-ico-256.png"
+  icon: "electron/icons/Nexo-Desctop-ico-512.png"
 
 nsis:
   oneClick: false
