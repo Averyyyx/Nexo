@@ -13,14 +13,15 @@
     "build:app": "npm run build:client && npm run prepare:public && node scripts/prepare-node.js",
     "electron:build": "npm run build:app && electron-builder build --win --publish never",
     "electron:dev": "electron .",
-    "electron:package": "electron-builder build --dir"
+    "electron:package": "electron-builder build --dir",
+    "postinstall": "electron-builder install-app-deps"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^11.10.0",
+    "better-sqlite3": "^13.0.3",
     "clamscan": "^2.4.0",
     "connect-redis": "^7.1.1",
     "cookie-parser": "^1.4.7",

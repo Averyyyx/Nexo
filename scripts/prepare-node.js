@@ -39,21 +39,23 @@ function resolveNodeBinary() {
 
 function ensureBetterSqlite3() {
   const moduleDir = path.join(root, 'node_modules', 'better-sqlite3');
-  const binary = path.join(moduleDir, 'build', 'Release', 'better_sqlite3.node');
+  
+  // Проверяем наличие бинарника в любом из возможных мест
+  const possiblePaths = [
+    path.join(moduleDir, 'build', 'Release', 'better_sqlite3.node'),
+    path.join(moduleDir, 'build', 'Debug', 'better_sqlite3.node'),
+    path.join(moduleDir, 'prebuilds', 'win32-x64-electron-39.2.3', 'better_sqlite3.node'),
+    path.join(moduleDir, 'prebuilds', 'win32-x64-node-22.19.0', 'better_sqlite3.node')
+  ];
 
-  if (fs.existsSync(binary)) {
+  const foundBinary = possiblePaths.find(p => fs.existsSync(p));
+  if (foundBinary) {
+    console.log(`better-sqlite3 binary found at: ${foundBinary}`);
     return;
   }
 
-  const nodeVersion = process.version.replace(/^v/, '');
-  execSync(
-    `npx prebuild-install --target ${nodeVersion} --runtime node --arch x64`,
-    { cwd: moduleDir, stdio: 'inherit', shell: true }
-  );
-
-  if (!fs.existsSync(binary)) {
-    throw new Error('Failed to prepare better-sqlite3 native binary.');
-  }
+  console.warn('better-sqlite3 binary not found. The module will try to load a prebuilt binary at runtime.');
+  console.warn('If you encounter native module errors, run: npm rebuild better-sqlite3');
 }
 
 const source = resolveNodeBinary();

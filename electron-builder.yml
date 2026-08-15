@@ -41,5 +41,11 @@ nsis:
 extraMetadata:
   main: electron/main.js
 
+extraResources:
+  - from: build/runtime
+    to: runtime
+    filter:
+      - "**/*"
+
 npmRebuild: false
 buildDependenciesFromSource: false

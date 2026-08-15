@@ -61,31 +61,46 @@ function setupLogging() {
 function waitForServer(maxAttempts = 60, intervalMs = 500) {
   return new Promise((resolve, reject) => {
     let attempts = 0;
+    let serverHealthy = false;
 
-    const check = () => {
+    const checkServerHealth = () => {
+      // Проверяем что процесс жив
+      if (!serverProcess || serverProcess.killed || serverProcess.exitCode !== null) {
+        reject(new Error('Server process died before becoming ready'));
+        return;
+      }
+
       attempts += 1;
       const req = http.get(`${SERVER_URL}/api/security/csrf-token`, (res) => {
         res.resume();
-        resolve();
+        // Дополнительная проверка - ждем 2 секунды чтобы убедиться что процесс остается живым
+        setTimeout(() => {
+          if (!serverProcess || serverProcess.killed || serverProcess.exitCode !== null) {
+            reject(new Error('Server process died immediately after opening port'));
+            return;
+          }
+          serverHealthy = true;
+          resolve();
+        }, 2000);
       });
       req.on('error', () => {
         if (attempts >= maxAttempts) {
-          reject(new Error('Server failed to start'));
+          reject(new Error('Server failed to start after maximum attempts'));
           return;
         }
-        setTimeout(check, intervalMs);
+        setTimeout(checkServerHealth, intervalMs);
       });
       req.setTimeout(1000, () => {
         req.destroy();
         if (attempts >= maxAttempts) {
-          reject(new Error('Server failed to start'));
+          reject(new Error('Server failed to start - timeout'));
           return;
         }
-        setTimeout(check, intervalMs);
+        setTimeout(checkServerHealth, intervalMs);
       });
     };
 
-    check();
+    checkServerHealth();
   });
 }
 
@@ -269,7 +284,26 @@ function checkForUpdates() {
 }
 
 function getServerRuntime() {
-  // В обоих режимах используем Electron как Node runtime
+  if (!app.isPackaged) {
+    // В разработке используем Electron как Node runtime
+    return {
+      execPath: process.execPath,
+      useElectronAsNode: true
+    };
+  }
+
+  // В packaged приложении используем встроенный runtime node.exe
+  const runtimePath = path.join(process.resourcesPath, 'runtime', 'node.exe');
+  if (fs.existsSync(runtimePath)) {
+    console.log('Using embedded runtime:', runtimePath);
+    return {
+      execPath: runtimePath,
+      useElectronAsNode: false
+    };
+  }
+
+  // Fallback на Electron как Node runtime
+  console.warn('Embedded runtime not found, falling back to Electron as Node');
   return {
     execPath: process.execPath,
     useElectronAsNode: true

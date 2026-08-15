@@ -1,66 +1,82 @@
 # Список потенциально ненужных файлов
 
-## Файлы для удаления:
+## Категория 1: ТОЧНО используется
+- server.js - основной файл сервера
+- electron/main.js - главный процесс Electron
+- electron/splash.html - splash screen
+- electron/welcome.html - welcome screen
+- electron/titlebar.html - кастомный title bar
+- electron/preload.js - проверка показала что файла нет в проекте
+- scripts/prepare-node.js - подготовка runtime node.exe
+- scripts/prepare-public.js - подготовка public
+- package.json - конфигурация проекта
+- electron-builder.yml - конфигурация Electron builder
+- build/runtime/node.exe - runtime для embedded server (85MB, нужен)
+
+## Категория 2: ВЕРОЯТНО используется
+- assets/**/* - SVG иконки для конвертации
+- electron/icons/**/* - PNG/ICO иконки для приложения
+- data/**/* - данные SQLite базы (в development)
+- uploads/**/* - загруженные файлы (в development)
+
+## Категория 3: НЕ используется (можно удалить)
 
 ### Временные файлы:
-- `server.js.backup` - бэкап старой версии server.js
-- `temp_server.js` - временный файл сервера
-- `commit_message.txt` - временный файл для commit сообщений (уже удален)
-- `commit_message2.txt` - временный файл для commit сообщений (уже удален)
-- `commit_message3.txt` - временный файл для commit сообщений (уже удален)
+- server.js.backup - бэкап старой версии server.js
+- temp_server.js - временный файл сервера
+- commit_message.txt - временный файл для commit сообщений
+- commit_message2.txt - временный файл для commit сообщений  
+- commit_message3.txt - временный файл для commit сообщений
 
 ### Старые build папки:
-- `dist_fixed/` - старая версия сборки
-- `dist_new/` - старая версия сборки
-- `dist_updated/` - старая версия сборки
-- `build/` - временные build файлы (пересоздаются при сборке)
+- dist/ - старая версия сборки (заблокирована после запуска)
+- dist_fixed/ - старая версия сборки
+- dist_new/ - старая версия сборки
+- dist_updated/ - старая версия сборки
+- dist_test/ - текущая тестовая сборка (нужно переименовать в dist)
 
-### Старые Electron ресурсы (если остались):
-- `chrome_100_percent.pak`
-- `chrome_200_percent.pak`
-- `d3dcompiler_47.dll`
-- `dxcompiler.dll`
-- `dxil.dll`
-- `ffmpeg.dll`
-- `icudtl.dat`
-- `libEGL.dll`
-- `libGLESv2.dll`
-- `resources.pak`
-- `snapshot_blob.bin`
-- `v8_context_snapshot.bin`
-- `vk_swiftshader.dll`
-- `vk_swiftshader_icd.json`
-- `vulkan-1.dll`
-- `LICENSE.electron.txt`
-- `LICENSES.chromium.html`
-- `Uninstall Vencord.exe`
-- `Vencord.exe`
+### Устаревшая документация:
+- ELECTRON_FIX_REPORT.md - старый отчет о исправлениях
+- PROJECT_ANALYSIS.md - старый анализ проекта
+- setup-nexo-local.md - возможно устаревшая инструкция
+- ROADMAP.md - возможно устаревший roadmap
+- CHANGELOG.md - можно удалить или обновить (есть в Git)
 
-### Документация (устаревшая):
-- `ELECTRON_FIX_REPORT.md` - старый отчет о исправлениях
-- `PROJECT_ANALYSIS.md` - старый анализ проекта
-- `setup-nexo-local.md` - возможно устаревшая инструкция
-- `ROADMAP.md` - возможно устаревший roadmap
+### Устаревшие Electron файлы:
+- locales/ - старые локали Electron
+- resources/ - старые ресурсы Electron
+- your_directory/ - неясная папка
 
-### Папки:
-- `locales/` - старые локали Electron
-- `resources/` - старые ресурсы Electron
-- `your_directory/` - неясная папка
+## Категория 4: НЕИЗВЕСТНО (требует проверки)
 
-## Примечание:
+### Не проверены:
+- Dockerfile - может использоваться для production
+- docker-compose.yml - может использоваться для production
+- deploy.sh - может использоваться для deployment
+- .github/workflows/deploy.yml - может использоваться для CI/CD
 
-**Эти файлы НЕ удалялись автоматически по вашему запросу.**
+## Рекомендации
 
-Вы можете удалить их вручную после проверки:
-```bash
-# Удаление временных файлов
-Remove-Item server.js.backup, temp_server.js
+### Безопасно удалить:
+- server.js.backup
+- temp_server.js
+- commit_message.txt
+- commit_message2.txt
+- commit_message3.txt
+- dist_fixed/
+- dist_new/
+- dist_updated/
+- ELECTRON_FIX_REPORT.md
+- PROJECT_ANALYSIS.md
+- ROADMAP.md
 
-# Удаление старых build папок
-Remove-Item -Recurse -Force dist_fixed, dist_new, dist_updated, build
+### Проверить перед удалением:
+- Dockerfile, docker-compose.yml, deploy.sh, .github/workflows/deploy.yml
+- locales/, resources/, your_directory/
 
-# Удаление старых Electron ресурсов
-Remove-Item *.dll, *.pak, *.dat, *.bin, *.json, LICENSE*.txt, LICENSE*.html, *.exe
-```
+### Переименовать:
+- dist_test/ → dist/ (для стандартного output directory)
 
-Generated build файлы в `dist/` не должны коммититься в Git благодаря обновленному `.gitignore`.
+## Примечание
+
+Этот список создан для анализа. Удаление НЕ выполнялось автоматически по требованию эксперта. Все изменения согласованы с сохранением архитектуры проекта.
