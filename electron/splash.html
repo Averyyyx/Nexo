@@ -43,49 +43,31 @@
             animation: fadeIn 0.5s ease-in;
         }
 
-        /* Анимация вращения молекул */
-        .molecule {
-            position: absolute;
-            border-radius: 50%;
-            animation: orbit 3s linear infinite;
+        /* Анимация вращения молекул по орбитам SVG */
+        .logo-svg circle {
+            animation: pulse 2s ease-in-out infinite;
         }
 
-        .molecule-1 {
-            width: 12px;
-            height: 12px;
-            background: #9966F2;
-            top: 20%;
-            left: 50%;
-            transform: translateX(-50%);
+        .logo-svg circle:nth-child(7) {
             animation-delay: 0s;
         }
 
-        .molecule-2 {
-            width: 12px;
-            height: 12px;
-            background: #4099F2;
-            bottom: 20%;
-            left: 50%;
-            transform: translateX(-50%);
-            animation-delay: 1s;
+        .logo-svg circle:nth-child(8) {
+            animation-delay: 0.7s;
         }
 
-        .molecule-3 {
-            width: 12px;
-            height: 12px;
-            background: #00E6CC;
-            top: 50%;
-            left: 20%;
-            transform: translateY(-50%);
-            animation-delay: 2s;
+        .logo-svg circle:nth-child(9) {
+            animation-delay: 1.4s;
         }
 
-        @keyframes orbit {
-            0% {
-                transform: translateX(-50%) translateY(0) rotate(0deg) translateX(60px) rotate(0deg);
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 0.6;
+                transform: scale(1);
             }
-            100% {
-                transform: translateX(-50%) translateY(0) rotate(360deg) translateX(60px) rotate(-360deg);
+            50% {
+                opacity: 1;
+                transform: scale(1.2);
             }
         }
 
@@ -154,10 +136,7 @@
 <body>
     <div class="container">
         <div class="logo-container">
-            <img src="nexo-loading-logo.svg" alt="Nexo Logo" class="logo">
-            <div class="molecule molecule-1"></div>
-            <div class="molecule molecule-2"></div>
-            <div class="molecule molecule-3"></div>
+            <img src="nexo-loading-logo.svg" alt="Nexo Logo" class="logo logo-svg">
         </div>
         <div class="loading-text" id="loadingText">Загрузка...</div>
         <div class="update-text" id="updateText">Обновление до версии 1.0.1</div>

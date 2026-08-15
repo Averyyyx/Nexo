@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexo Title Bar</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .titlebar {
+            background: linear-gradient(135deg, #66FFF2, #33BFE6, #734DE6);
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 10px;
+            -webkit-app-region: drag;
+            user-select: none;
+        }
+
+        .titlebar-title {
+            color: white;
+            font-size: 13px;
+            font-weight: 500;
+            flex: 1;
+            text-align: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .titlebar-controls {
+            display: flex;
+            gap: 8px;
+            -webkit-app-region: no-drag;
+        }
+
+        .titlebar-button {
+            width: 12px;
+            height: 12px;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .titlebar-button:hover {
+            transform: scale(1.1);
+        }
+
+        .titlebar-minimize {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .titlebar-minimize:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .titlebar-close {
+            background: rgba(255, 100, 100, 0.3);
+        }
+
+        .titlebar-close:hover {
+            background: rgba(255, 100, 100, 0.5);
+        }
+
+        .titlebar-button svg {
+            width: 8px;
+            height: 8px;
+            fill: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="titlebar">
+        <div class="titlebar-title">Nexo</div>
+        <div class="titlebar-controls">
+            <button class="titlebar-button titlebar-minimize" id="minimizeButton" title="Свернуть">
+                <svg viewBox="0 0 10 1" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="10" height="1" fill="white"/>
+                </svg>
+            </button>
+            <button class="titlebar-button titlebar-close" id="closeButton" title="Закрыть">
+                <svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 1L9 9M9 1L1 9" stroke="white" stroke-width="1.5" fill="none"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+        
+        document.getElementById('minimizeButton').addEventListener('click', () => {
+            ipcRenderer.send('minimize-window');
+        });
+        
+        document.getElementById('closeButton').addEventListener('click', () => {
+            ipcRenderer.send('close-window');
+        });
+    </script>
+</body>
+</html>

@@ -12,7 +12,8 @@ let notificationCount = 0;
 const SERVER_PORT = process.env.PORT || 4000;
 
 // ВАЖНО: Electron должен всегда использовать локальный сервер
-const SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`;
+// Используем localhost для лучшей совместимости с VPN
+const SERVER_URL = `http://localhost:${SERVER_PORT}`;
 
 // Функция логирования (инициализируется внутри app.whenReady)
 let logFile = null;
@@ -368,8 +369,8 @@ function createSplashWindow() {
   console.log('Creating splash window...');
   
   splashWindow = new BrowserWindow({
-    width: 400,
-    height: 500,
+    width: 300,
+    height: 400,
     resizable: false,
     frame: false,
     alwaysOnTop: true,
@@ -411,6 +412,8 @@ function createWindow() {
     height: 800,
     minWidth: 1024,
     minHeight: 768,
+    frame: false, // Убираем стандартную рамку
+    titleBarStyle: 'hidden',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

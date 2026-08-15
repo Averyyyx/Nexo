@@ -3,7 +3,7 @@ productName: Nexo
 copyright: Copyright © 2026 Nexo
 
 directories:
-  output: dist_new
+  output: dist_updated
   buildResources: build
 
 files:

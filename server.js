@@ -803,6 +803,14 @@ const allowedOrigins = (process.env.CLIENT_ORIGIN || process.env.CORS_ORIGIN || 
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+// Добавляем localhost для Electron приложения
+if (!allowedOrigins.includes('http://localhost:4000')) {
+  allowedOrigins.push('http://localhost:4000');
+}
+if (!allowedOrigins.includes('http://127.0.0.1:4000')) {
+  allowedOrigins.push('http://127.0.0.1:4000');
+}
+
 app.set('trust proxy', 1);
 
 if (REQUIRE_HTTPS) {
