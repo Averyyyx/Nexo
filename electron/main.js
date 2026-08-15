@@ -1,11 +1,14 @@
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, Tray, Menu, nativeImage, ipcMain } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');
 const http = require('http');
 const fs = require('fs');
 
 let mainWindow = null;
+let splashWindow = null;
+let tray = null;
 let serverProcess = null;
+let notificationCount = 0;
 const SERVER_PORT = process.env.PORT || 4000;
 
 // ВАЖНО: Electron должен всегда использовать локальный сервер
@@ -83,6 +86,174 @@ function waitForServer(maxAttempts = 60, intervalMs = 500) {
 
     check();
   });
+}
+
+function getIconPath(iconName) {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'app.asar.unpacked', 'electron', 'icons', `${iconName}.png`);
+  } else {
+    return path.join(__dirname, 'icons', `${iconName}.png`);
+  }
+}
+
+function getTrayIconPath() {
+  const iconName = notificationCount > 0 ? 'nexo-ico-mini-ping' : 'nexo-ico-mini';
+  return getIconPath(iconName);
+}
+
+function createTray() {
+  console.log('Creating system tray...');
+  
+  const trayIconPath = getTrayIconPath();
+  const trayImage = nativeImage.createFromPath(trayIconPath);
+  
+  tray = new Tray(trayImage);
+  
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Открыть Nexo',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      }
+    },
+    {
+      label: 'Проверить обновления',
+      click: () => {
+        checkForUpdates();
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Выход',
+      click: () => {
+        app.isQuitting = true;
+        app.quit();
+      }
+    }
+  ]);
+  
+  tray.setToolTip('Nexo');
+  tray.setContextMenu(contextMenu);
+  
+  tray.on('click', () => {
+    if (mainWindow) {
+      if (mainWindow.isVisible()) {
+        mainWindow.hide();
+      } else {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    }
+  });
+  
+  console.log('System tray created');
+}
+
+// IPC handlers
+ipcMain.on('set-notification-count', (event, count) => {
+  setNotificationCount(count);
+  // Отправляем уведомление обратно в renderer
+  if (mainWindow) {
+    mainWindow.webContents.send('notification-updated', count);
+  }
+});
+
+ipcMain.on('minimize-window', () => {
+  if (mainWindow) {
+    mainWindow.minimize();
+  }
+});
+
+ipcMain.on('maximize-window', () => {
+  if (mainWindow) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+
+ipcMain.on('close-window', () => {
+  if (mainWindow) {
+    mainWindow.close();
+  }
+});
+
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+
+function updateTrayIcon() {
+  if (!tray) return;
+  
+  const trayIconPath = getTrayIconPath();
+  const trayImage = nativeImage.createFromPath(trayIconPath);
+  tray.setImage(trayImage);
+  
+  const tooltip = notificationCount > 0 
+    ? `Nexo (${notificationCount} уведомлений)` 
+    : 'Nexo';
+  tray.setToolTip(tooltip);
+}
+
+function setNotificationCount(count) {
+  notificationCount = Math.min(count, 9); // Максимум 9
+  
+  // Обновляем иконку трея
+  updateTrayIcon();
+  
+  // Обновляем иконку главного окна
+  if (mainWindow) {
+    const iconName = count > 0 ? `Nexo-desctop-ico-${count}ping` : 'Nexo-Desctop-ico';
+    const iconPath = getIconPath(iconName);
+    mainWindow.setIcon(nativeImage.createFromPath(iconPath));
+  }
+}
+
+function checkForUpdates() {
+  console.log('Checking for updates...');
+  
+  if (splashWindow) {
+    splashWindow.webContents.send('loading-status', 'Проверка обновлений...');
+  }
+  
+  // Симуляция проверки обновлений
+  setTimeout(() => {
+    const hasUpdate = Math.random() > 0.5; // 50% шанс обновления для демо
+    
+    if (hasUpdate) {
+      console.log('Update available!');
+      if (splashWindow) {
+        splashWindow.webContents.send('update-available', '1.0.1');
+      }
+      
+      // Симуляция загрузки обновления
+      let progress = 0;
+      const updateInterval = setInterval(() => {
+        progress += 10;
+        if (splashWindow) {
+          splashWindow.webContents.send('update-progress', progress);
+        }
+        
+        if (progress >= 100) {
+          clearInterval(updateInterval);
+          if (splashWindow) {
+            splashWindow.webContents.send('update-complete');
+            splashWindow.webContents.send('loading-status', 'Загрузка...');
+          }
+        }
+      }, 300);
+    } else {
+      console.log('No updates available');
+      if (splashWindow) {
+        splashWindow.webContents.send('loading-status', 'Загрузка...');
+      }
+    }
+  }, 1000);
 }
 
 function getServerRuntime() {
@@ -193,8 +364,47 @@ function startServer() {
   console.log('Server process started with PID:', serverProcess.pid);
 }
 
+function createSplashWindow() {
+  console.log('Creating splash window...');
+  
+  splashWindow = new BrowserWindow({
+    width: 400,
+    height: 500,
+    resizable: false,
+    frame: false,
+    alwaysOnTop: true,
+    transparent: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    },
+    show: false,
+    backgroundColor: '#0D0A1A'
+  });
+
+  const splashPath = path.join(__dirname, 'splash.html');
+  console.log('Loading splash from:', splashPath);
+  
+  splashWindow.loadFile(splashPath);
+  
+  splashWindow.once('ready-to-show', () => {
+    console.log('Splash window ready to show');
+    splashWindow.center();
+    splashWindow.show();
+    
+    // Отправляем версию приложения
+    const version = app.getVersion();
+    splashWindow.webContents.send('app-version', version);
+  });
+
+  splashWindow.on('closed', () => {
+    console.log('Splash window closed');
+    splashWindow = null;
+  });
+}
+
 function createWindow() {
-  console.log('Creating BrowserWindow...');
+  console.log('Creating main window...');
   
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -204,11 +414,13 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: true
+      webSecurity: true,
+      preload: path.join(__dirname, 'preload.js')
     },
     title: 'Nexo',
     show: false,
-    backgroundColor: '#1e1e1e'
+    backgroundColor: '#0D0A1A',
+    icon: getIconPath('Nexo-Desctop-ico')
   });
 
   // Добавляем обработчики ошибок загрузки
@@ -225,24 +437,35 @@ function createWindow() {
   });
 
   console.log('Loading URL:', SERVER_URL);
-  mainWindow.loadURL(SERVER_URL)
+  
+  // Сначала загружаем welcome screen
+  const welcomePath = path.join(__dirname, 'welcome.html');
+  mainWindow.loadFile(welcomePath)
     .then(() => {
-      console.log('URL loaded successfully');
+      console.log('Welcome screen loaded successfully');
     })
     .catch(err => {
-      console.error('Failed to load URL:', err);
-      // Показываем ошибку пользователю
-      mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(`
-        <html>
-          <head><title>Nexo Error</title></head>
-          <body style="background: #1e1e1e; color: white; font-family: sans-serif; padding: 20px;">
-            <h1>Nexo Failed to Start</h1>
-            <p>Could not load the application. Error: ${err.message}</p>
-            <p>Server URL: ${SERVER_URL}</p>
-            <p>Please check the console for more details.</p>
-          </body>
-        </html>
-      `));
+      console.error('Failed to load welcome screen:', err);
+      // Если welcome screen не загрузился, загружаем основной URL
+      mainWindow.loadURL(SERVER_URL)
+        .then(() => {
+          console.log('URL loaded successfully');
+        })
+        .catch(loadErr => {
+          console.error('Failed to load URL:', loadErr);
+          // Показываем ошибку пользователю
+          mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(`
+            <html>
+              <head><title>Nexo Error</title></head>
+              <body style="background: #1e1e1e; color: white; font-family: sans-serif; padding: 20px;">
+                <h1>Nexo Failed to Start</h1>
+                <p>Could not load the application. Error: ${err.message}</p>
+                <p>Server URL: ${SERVER_URL}</p>
+                <p>Please check the console for more details.</p>
+              </body>
+            </html>
+          `));
+        });
     });
 
   mainWindow.once('ready-to-show', () => {
@@ -254,8 +477,17 @@ function createWindow() {
   });
 
   mainWindow.on('closed', () => {
-    console.log('Window closed');
+    console.log('Main window closed');
     mainWindow = null;
+  });
+  
+  // При закрытии окна - скрываем в трей, а не закрываем приложение
+  mainWindow.on('close', (event) => {
+    if (!app.isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+      console.log('Window hidden to tray');
+    }
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -285,18 +517,49 @@ app.whenReady().then(async () => {
     console.log('Server URL:', SERVER_URL);
     console.log('Server Port:', SERVER_PORT);
     
+    // Сначала создаем splash screen
+    createSplashWindow();
+    
     // Запускаем встроенный сервер
     console.log('Starting embedded server...');
+    if (splashWindow) {
+      splashWindow.webContents.send('loading-status', 'Запуск сервера...');
+    }
     startServer();
     
     // Ждем, пока сервер станет доступен
     console.log('Waiting for server to be ready...');
+    if (splashWindow) {
+      splashWindow.webContents.send('loading-status', 'Ожидание сервера...');
+    }
     await waitForServer();
     console.log('Server is ready!');
     
-    // Создаем окно только после того, как сервер готов
+    // Проверяем обновления
+    checkForUpdates();
+    
+    // Создаем system tray
+    createTray();
+    
+    // Создаем главное окно только после того, как сервер готов
     console.log('Creating main window...');
+    if (splashWindow) {
+      splashWindow.webContents.send('loading-status', 'Загрузка интерфейса...');
+    }
     createWindow();
+    
+    // Когда главное окно готово, закрываем splash screen
+    mainWindow.once('ready-to-show', () => {
+      console.log('Main window ready, closing splash...');
+      if (splashWindow) {
+        splashWindow.close();
+      }
+      mainWindow.show();
+      
+      if (process.env.NODE_ENV === 'development') {
+        mainWindow.webContents.openDevTools({ mode: 'detach' });
+      }
+    });
     
     console.log('=== Nexo Started Successfully ===');
   } catch (error) {
@@ -345,9 +608,8 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  // Не закрываем приложение когда все окна закрыты - оно работает в фоне
+  console.log('All windows closed, keeping app running in background');
 });
 
 app.on('before-quit', () => {

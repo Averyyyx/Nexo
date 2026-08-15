@@ -2724,6 +2724,10 @@ app.get('/api/auth/session', (req, res) => {
   res.json({ user: sanitizeUser(req.user) });
 });
 
+app.get('/api/auth/status', (req, res) => {
+  res.json({ authenticated: !!req.user });
+});
+
 app.get('/api/auth/github', (req, res, next) => {
   if (!githubReady) {
     return res.status(503).json({ message: 'GitHub OAuth is not configured.' });

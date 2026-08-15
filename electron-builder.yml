@@ -18,6 +18,7 @@ asar: true
 asarUnpack:
   - "server.js"
   - "public/**/*"
+  - "electron/icons/**/*"
   - "**/node_modules/better-sqlite3/**/*"
 
 win:
@@ -27,6 +28,7 @@ win:
         - x64
   artifactName: "${productName}-${version}-Setup.${ext}"
   signAndEditExecutable: false
+  icon: "electron/icons/Nexo-Desctop-ico-256.png"
 
 nsis:
   oneClick: false
