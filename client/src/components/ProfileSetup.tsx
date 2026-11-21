@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Check, Palette } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import type { User } from '../types';
+import { Field, Input, Textarea } from './ui';
 
 type Status = { type: 'idle' | 'loading' | 'success' | 'error'; message?: string };
 type HandleState = 'idle' | 'checking' | 'available' | 'taken';
@@ -100,30 +101,19 @@ export function ProfileSetup({ user, onComplete }: ProfileSetupProps) {
           <div><strong>{displayName || 'Новое имя'}</strong><small>@{previewHandle}</small></div>
         </div>
 
-        <label>
-          <span>Отображаемое имя</span>
-          <input type="text" placeholder="Например, Лена из студии" value={displayName}
-            onChange={(event) => setDisplayName(event.target.value)} minLength={2} maxLength={32} required />
-        </label>
+        <Field label="Отображаемое имя"><Input type="text" placeholder="Например, Лена из студии" value={displayName}
+            onChange={(event) => setDisplayName(event.target.value)} minLength={2} maxLength={32} required /></Field>
 
-        <label>
-          <span>Основной ник</span>
+        <Field label="Основной ник" hint={handleMessage || '3–24 символа: a–z, 0–9, точка, дефис или подчёркивание.'}>
           <div className="handle-field">
-            <input type="text" placeholder="orbit-designer" value={handle}
+            <Input type="text" placeholder="orbit-designer" value={handle}
               onChange={(event) => setHandle(event.target.value)} minLength={3} maxLength={24} required />
             <button type="button" className="ghost" onClick={generateFromName}>Предложить</button>
           </div>
-          <small className={`handle-availability ${handleState}`}>
-            {handleMessage || '3–24 символа: a–z, 0–9, точка, дефис или подчёркивание. Первый и последний символ — буква или цифра.'}
-          </small>
-        </label>
+        </Field>
 
-        <label>
-          <span>О себе <small>(необязательно)</small></span>
-          <textarea value={bio} onChange={(event) => setBio(event.target.value)}
-            placeholder="Немного о себе и над чем вы работаете…" maxLength={200} rows={3} />
-          <small>{bio.length}/200</small>
-        </label>
+        <Field label="О себе (необязательно)" hint={`${bio.length}/200`}><Textarea value={bio} onChange={(event) => setBio(event.target.value)}
+            placeholder="Немного о себе и над чем вы работаете…" maxLength={200} rows={3} /></Field>
 
         <div className="avatar-color-picker">
           <div><Palette size={15} /><span>Цвет аватара</span></div>

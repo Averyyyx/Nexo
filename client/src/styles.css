@@ -2448,24 +2448,18 @@
 .home-empty strong { color: var(--text); font: 600 17px var(--font-serif); }
 .home-empty p { font-size: 12px; }
 .nexo-statusbar { display: flex; flex: 0 0 66px; min-height: 66px; align-items: center; justify-content: space-between; gap: 14px; padding: 7px 10px; border-top: 1px solid var(--border); background: var(--bg-secondary); }
-.nexo-user-dock { display: flex; align-items: center; gap: 15px; padding: 5px 7px 5px 9px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
-.dock-user { display: flex; min-width: 150px; align-items: center; gap: 9px; padding: 0; border: 0; background: transparent; color: var(--text); cursor: pointer; text-align: left; }
-.dock-user-copy { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
-.dock-user-copy strong { max-width: 160px; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.dock-user-copy small { color: var(--text-faint); font-size: 12px; }
-.dock-actions { display: flex; align-items: center; gap: 4px; }
-.dock-device-wrap { position: relative; display: flex; align-items: center; }
-.dock-icon, .dock-device-arrow {
-  display: grid; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 7px;
+.nexo-user-dock { display: flex; width: 100%; min-width: 0; height: 52px; flex: 0 0 52px; align-items: center; gap: 8px; padding: 6px 7px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.dock-user { display: flex; min-width: 0; flex: 1 1 auto; align-items: center; gap: 8px; padding: 0; border: 0; background: transparent; color: var(--text); text-align: left; }
+.dock-user-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.dock-user-copy strong { max-width: 100%; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.dock-user-copy small { overflow: hidden; color: var(--text-faint); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.dock-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 2px; }
+.dock-icon {
+  display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border: 0; border-radius: 8px;
   background: transparent; color: var(--text-muted); cursor: pointer; transition: background 120ms ease, color 120ms ease;
 }
-.dock-device-arrow { width: 15px; }
-.dock-icon:hover, .dock-device-arrow:hover { background: var(--surface-hover); color: var(--text); }
-.dock-icon.danger { color: var(--danger); }
-.device-popover { position: absolute; right: 0; bottom: 38px; z-index: 40; min-width: 190px; max-width: 260px; padding: 5px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); box-shadow: none; }
-.device-popover button { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 8px; padding: 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; text-align: left; font-size: 12px; }
-.device-popover button:hover, .device-popover button.active { background: var(--surface-hover); }
-.device-popover p { padding: 8px; color: var(--text-muted); font-size: 12px; }
+.dock-icon:hover { background: var(--surface-hover); color: var(--text); }
+.dock-icon.danger { color: var(--danger); background: var(--danger-soft); }
 .nexo-avatar { position: relative; display: inline-grid; flex: 0 0 auto; place-items: center; overflow: visible; border-radius: 50%; color: white; font-weight: 600; }
 .nexo-avatar > img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
 .nexo-avatar-status { position: absolute; right: -1px; bottom: -1px; width: 10px; height: 10px; border: 2px solid var(--surface); border-radius: 50%; background: var(--status-offline); }
@@ -2550,17 +2544,11 @@
   display: flex; flex: 0 0 auto; min-width: 0; flex-direction: column; gap: 6px;
   margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border);
 }
-.sidebar-user-area .nexo-user-dock {
-  display: flex; width: 100%; min-width: 0; flex-direction: column; align-items: stretch;
-  gap: 8px; padding: 9px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
-}
-.sidebar-user-area .dock-user { min-width: 0; width: 100%; }
-.sidebar-user-area .dock-user-copy strong { max-width: 155px; }
-.sidebar-user-area .dock-actions { justify-content: space-between; border-top: 1px solid var(--border); padding-top: 6px; }
-.sidebar-user-area .dock-device-wrap { gap: 1px; }
-.sidebar-user-area .dock-icon { width: 34px; height: 31px; }
-.sidebar-user-area .dock-device-arrow { width: 14px; height: 28px; }
-.sidebar-user-area .device-popover { right: auto; left: 0; bottom: 35px; }
+.sidebar-user-area .nexo-user-dock { flex-direction: row; align-items: center; gap: 7px; padding: 6px; }
+.sidebar-user-area .dock-user { min-width: 0; width: auto; flex: 1 1 auto; }
+.sidebar-user-area .dock-user-copy strong { max-width: 100%; }
+.sidebar-user-area .dock-actions { justify-content: flex-end; border: 0; padding: 0; }
+.sidebar-user-area .dock-icon { width: 32px; height: 32px; }
 .nexo-workbench.settings-active .nexo-tab-content { width: 100%; }
 .workspace-grid.servers:has(.channel-members-panel) {
   grid-template-columns: minmax(215px, 260px) minmax(0, 1fr) 238px;
@@ -3002,18 +2990,6 @@ html[data-reduce-motion="true"] .nexo-root *, html[data-reduce-motion="true"] .n
 .dock-icon:active { transform: scale(.96); }
 .dock-icon:focus-visible, .dock-user:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.nexo-context-menu:has(.dock-account-menu) { width: 276px; max-height: calc(100vh - 24px); overflow-y: auto; padding: 8px; }
-.dock-account-menu { display: flex; flex-direction: column; gap: 2px; }
-.dock-menu-profile { display: flex; align-items: center; gap: 10px; padding: 7px 6px 10px; }
-.dock-menu-profile > span { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
-.dock-menu-profile strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.dock-menu-profile small { color: var(--text-muted); font-size: 12px; }
-.dock-menu-label { margin: 5px 7px 2px; color: var(--text-faint); font-size: 12px; font-weight: 650; letter-spacing: .04em; }
-.dock-menu-divider { height: 1px; margin: 5px 2px; background: var(--border); }
-.nexo-context-menu .dock-menu-select { display: flex; flex-direction: column; gap: 5px; padding: 5px 7px; color: var(--text-muted); font-size: 12px; }
-.dock-menu-select select { width: 100%; min-height: 32px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg-secondary); color: var(--text); font: 12px var(--font-sans); }
-.dock-menu-hint { margin: 0 7px 3px; color: var(--text-faint); font-size: 12px; line-height: 1.4; }
-.nexo-context-menu .dock-account-menu > button { min-height: 34px; font-size: 12px; }
 .sidebar-row.has-mention::after { left: 3px; }
 
 .nexo-default-avatar { display: grid; place-items: center; overflow: hidden; border-radius: 50%; color: rgba(255,255,255,.94); }
@@ -3072,7 +3048,6 @@ html[data-reduce-motion="true"] .nexo-root *, html[data-reduce-motion="true"] .n
   .call-banner-controls { margin-left: auto; }
 }
 
-.dock-status-icon { display: inline-flex; min-width: 26px; align-items: center; gap: 5px; }
 
 /* Readability floor for the workspace navigation */
 .nexo-tab .tab-title { font-size: 13px; }
@@ -3102,7 +3077,6 @@ html[data-reduce-motion="true"] .nexo-root *, html[data-reduce-motion="true"] .n
 
 .nexo-workbench.settings-active .nexo-sidebar { display: none; }
 
-.dock-menu-select input[type='range'] { width: 100%; min-height: 16px; padding: 0; accent-color: var(--accent); }
 
 .incoming-call-busy-note { margin: 0; color: var(--text-muted); font-size: 12px; text-align: center; }
 
@@ -3242,3 +3216,285 @@ html[data-reduce-motion="true"] .nexo-root *, html[data-reduce-motion="true"] .n
   color: var(--text-muted);
   font-size: 12px;
 }
+
+
+/* Nexo 0.0.8 — compact, pinned account dock and active call strip */
+.sidebar-user-area { margin-top: auto !important; padding-top: 8px; overflow: visible; }
+.sidebar-user-area .nexo-user-dock { height: 52px; min-height: 52px; flex: 0 0 52px; }
+.sidebar-user-area .dock-user { cursor: default; }
+.sidebar-user-area .dock-actions { gap: 2px; }
+.sidebar-user-area .dock-icon { position: relative; width: 32px; height: 32px; border-radius: 8px; }
+.sidebar-user-area .dock-icon.danger { color: var(--danger); background: var(--danger-soft); }
+.sidebar-user-area .dock-icon[data-tooltip]::after {
+  position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 100;
+  padding: 6px 9px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--text); color: var(--bg); content: attr(data-tooltip);
+  font-size: 12px; font-weight: 500; line-height: 1.2; white-space: nowrap;
+  opacity: 0; pointer-events: none; transform: translateY(3px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.sidebar-user-area .dock-icon[data-tooltip]:hover::after,
+.sidebar-user-area .dock-icon[data-tooltip]:focus-visible::after { opacity: 1; transform: translateY(0); }
+.active-call-strip {
+  display: flex; width: 100%; min-width: 0; height: 40px; flex: 0 0 40px;
+  align-items: center; gap: 6px; padding: 4px 6px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+}
+.active-call-return {
+  display: flex; min-width: 0; flex: 1 1 auto; align-items: center; gap: 9px;
+  padding: 0 3px; border: 0; border-radius: 7px; background: transparent;
+  color: var(--text); cursor: pointer; text-align: left;
+}
+.active-call-return:hover { background: var(--surface-hover); }
+.active-call-return .status-dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px var(--success-soft); }
+.active-call-copy { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
+.active-call-copy strong { overflow: hidden; font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.active-call-copy small { color: var(--text-muted); font-size: 12px; }
+.active-call-strip .hangup {
+  display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center;
+  border: 0; border-radius: 8px; background: var(--danger-soft); color: var(--danger); cursor: pointer;
+}
+.active-call-strip .hangup:hover { background: var(--danger); color: white; }
+
+
+/* Nexo 0.0.8 — voice channels */
+.sidebar-voice-channel { display: flex; flex-direction: column; gap: 2px; }
+.sidebar-voice-channel .voice-channel-row { min-height: 34px; }
+.sidebar-voice-channel .voice-channel-row > small { margin-left: auto; color: var(--text-faint); font-size: 12px; }
+.sidebar-voice-member { display: flex; min-width: 0; align-items: center; gap: 7px; padding: 3px 10px 3px 28px; color: var(--text-muted); font-size: 12px; }
+.sidebar-voice-member > span:nth-child(2) { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-voice-member > svg { flex: 0 0 auto; color: var(--text-faint); }
+.active-voice-panel {
+  display: flex; flex-direction: column; gap: 7px; min-width: 0; padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--success) 30%, var(--border));
+  border-radius: 11px; background: var(--surface);
+}
+.active-voice-heading { display: flex; min-width: 0; align-items: center; gap: 6px; }
+.active-voice-return { display: flex; min-width: 0; flex: 1; align-items: center; gap: 8px; padding: 0 3px; border: 0; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.active-voice-return > span:last-child { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.active-voice-return strong { color: var(--success); font-size: 13px; font-weight: 650; }
+.active-voice-return small { overflow: hidden; color: var(--text-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.active-voice-dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px var(--success-soft); }
+.active-voice-heading .hangup { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border: 0; border-radius: 8px; background: var(--danger-soft); color: var(--danger); cursor: pointer; }
+.active-voice-actions { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 5px; }
+.active-voice-actions button { display: grid; width: 100%; height: 32px; place-items: center; border: 0; border-radius: 8px; background: var(--bg-secondary); color: var(--text-muted); cursor: pointer; }
+.active-voice-actions button:hover { background: var(--surface-hover); color: var(--text); }
+.active-voice-actions button.is-off { background: var(--danger-soft); color: var(--danger); }
+.voice-room { display: flex; width: 100%; height: 100%; min-height: 0; flex-direction: column; gap: 14px; padding: 18px; overflow: auto; background: #0f0e0e; color: #f4f0e9; }
+.voice-room-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.voice-room-header > div { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.voice-room-header > div > div { display: flex; flex-direction: column; gap: 3px; }
+.voice-room-header strong { font: 600 18px var(--font-serif); }
+.voice-room-header small { color: #a9a39a; font-size: 12px; }
+.voice-room-indicator { width: 9px; height: 9px; border-radius: 50%; background: #65bd87; box-shadow: 0 0 0 4px rgba(101,189,135,.14); }
+.voice-room-leave { display: inline-flex; height: 36px; align-items: center; gap: 7px; padding: 0 12px; border: 0; border-radius: 9px; background: #d64045; color: white; cursor: pointer; }
+.voice-room-grid { display: grid; flex: 1; min-height: 260px; align-content: center; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+.voice-member-tile { display: flex; min-height: 170px; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 14px; border: 1px solid rgba(255,255,255,.09); border-radius: 14px; background: #191817; }
+.voice-member-tile.speaking { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent); }
+.voice-member-tile > video { width: 100%; max-height: 340px; aspect-ratio: 16/9; border-radius: 10px; object-fit: contain; background: #090909; }
+.voice-member-label { display: flex; align-items: center; gap: 6px; color: #f4f0e9; font-size: 13px; }
+.voice-member-label svg { color: #ff8b8f; }
+.voice-room-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; padding: 8px; }
+.voice-room-controls button { display: flex; min-width: 76px; height: 44px; align-items: center; justify-content: center; gap: 7px; padding: 0 12px; border: 0; border-radius: 10px; background: #211f1e; color: #f4f0e9; cursor: pointer; }
+.voice-room-controls button svg { width: 19px; height: 19px; }
+.voice-room-controls button span { font-size: 12px; }
+.voice-room-controls button.is-off { background: rgba(214,64,69,.25); color: #ff8b8f; }
+.voice-room-controls button.is-on { background: rgba(217,119,87,.22); color: #f0a184; }
+.voice-room-controls .voice-room-hangup { background: #d64045; color: white; }
+.voice-room-error { margin: 0; padding: 9px 12px; border: 1px solid rgba(214,64,69,.45); border-radius: 9px; color: #ff9a9e; font-size: 12px; }
+.voice-room-loading, .voice-room-limit-note { margin: 0; color: #aaa39a; font-size: 12px; text-align: center; }
+
+
+/* Shared form primitives */
+.nexo-field { display: flex; min-width: 0; flex-direction: column; gap: 6px; color: var(--text); }
+.nexo-field > span:first-child { color: var(--text-muted); font-size: 13px; }
+.nexo-field-control { display: flex; min-width: 0; }
+.nexo-field-hint, .nexo-field-error { font-size: 12px; line-height: 1.4; }
+.nexo-field-hint { color: var(--text-faint); }
+.nexo-field-error { color: var(--danger); }
+.nexo-input, .nexo-textarea, .nexo-select {
+  width: 100%; min-width: 0; min-height: 40px; padding: 0 11px;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface); color: var(--text); font: 14px var(--font-sans);
+  outline: none; transition: border-color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+}
+.nexo-input::placeholder, .nexo-textarea::placeholder { color: var(--text-faint); }
+.nexo-input:focus, .nexo-textarea:focus, .nexo-select:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.nexo-input[aria-invalid="true"], .nexo-textarea[aria-invalid="true"] { border-color: var(--danger); }
+.nexo-input:disabled, .nexo-textarea:disabled, .nexo-select:disabled { opacity: .6; cursor: not-allowed; }
+.nexo-textarea { min-height: 88px; padding: 10px 11px; resize: vertical; }
+.nexo-select-wrap { position: relative; display: block; width: 100%; }
+.nexo-select { appearance: none; padding-right: 34px; cursor: pointer; }
+.nexo-select-wrap > svg { position: absolute; top: 50%; right: 11px; color: var(--text-muted); pointer-events: none; transform: translateY(-50%); }
+.nexo-switch { position: relative; display: inline-flex; width: 36px; height: 20px; flex: 0 0 36px; align-items: center; padding: 2px; border: 0; border-radius: 99px; background: var(--border-strong); cursor: pointer; transition: background 150ms ease; }
+.nexo-switch > span { width: 16px; height: 16px; border-radius: 50%; background: white; box-shadow: 0 1px 2px rgba(0,0,0,.18); transition: transform 150ms ease; }
+.nexo-switch.checked { background: var(--accent); }
+.nexo-switch.checked > span { transform: translateX(16px); }
+.nexo-switch:disabled { opacity: .6; cursor: not-allowed; }
+.nexo-slider { display: flex; min-width: 0; align-items: center; gap: 12px; color: var(--text); font-size: 13px; }
+.nexo-slider input { flex: 1; min-width: 70px; height: 4px; accent-color: var(--accent); }
+.nexo-slider output { min-width: 42px; color: var(--text-muted); text-align: right; font-variant-numeric: tabular-nums; }
+.nexo-ui-button { display: inline-flex; width: auto; min-width: 0; align-items: center; justify-content: center; gap: 8px; border: 1px solid transparent; border-radius: 10px; font: 600 13px var(--font-sans); cursor: pointer; transition: background 120ms ease, color 120ms ease, transform 80ms ease; }
+.nexo-ui-button.sm { min-height: 32px; padding: 0 10px; }
+.nexo-ui-button.md { min-height: 36px; padding: 0 13px; }
+.nexo-ui-button.lg { min-height: 44px; padding: 0 16px; }
+.nexo-ui-button.primary { background: var(--accent); color: white; }
+.nexo-ui-button.secondary { border-color: var(--border); background: var(--surface); color: var(--text); }
+.nexo-ui-button.ghost { background: transparent; color: var(--text-muted); }
+.nexo-ui-button.danger { background: var(--danger-soft); color: var(--danger); }
+.nexo-ui-button:hover { filter: brightness(1.05); }
+.nexo-ui-button:active { transform: scale(.97); }
+.nexo-ui-button:disabled { opacity: .6; cursor: not-allowed; }
+.nexo-icon-button { position: relative; display: inline-grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.nexo-icon-button:hover, .nexo-icon-button:focus-visible { border-color: var(--border); background: var(--surface-hover); color: var(--text); }
+.nexo-icon-button:focus-visible, .nexo-ui-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nexo-tooltip { position: relative; display: inline-flex; }
+.nexo-tooltip::after { position: absolute; bottom: calc(100% + 8px); left: 50%; z-index: 1200; padding: 6px 9px; border-radius: 8px; background: var(--text); color: var(--bg); content: attr(data-tooltip); font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transform: translate(-50%, 3px); transition: opacity 120ms ease, transform 120ms ease; }
+.nexo-tooltip:hover::after, .nexo-tooltip:focus-within::after { opacity: 1; transform: translate(-50%, 0); }
+.nexo-ui-modal-backdrop { position: fixed; inset: 0; z-index: 1300; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,.48); }
+.nexo-ui-modal { display: flex; width: min(440px, calc(100vw - 32px)); max-height: min(84vh, 820px); flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: 0 18px 54px rgba(0,0,0,.18); animation: nexo-modal-in 160ms ease both; }
+.nexo-ui-modal.wide { width: min(560px, calc(100vw - 32px)); }
+.nexo-ui-modal > header { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 18px 22px 12px; }
+.nexo-ui-modal > header h2 { margin: 0; font: 600 20px var(--font-serif); }
+.nexo-ui-modal-content { min-height: 0; overflow: auto; padding: 12px 22px 22px; }
+.nexo-ui-modal > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 22px 18px; border-top: 1px solid var(--border); }
+@keyframes nexo-modal-in { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: scale(1); } }
+
+
+/* Incoming call buttons now have clear text labels; message times use Nexo tooltips. */
+.message-body header .message-time { position: relative; opacity: 0; transition: opacity 120ms ease; }
+.message-row:hover .message-body header .message-time,
+.message-row:focus-within .message-body header .message-time { opacity: 1; }
+.message-body header .message-time::after {
+  position: absolute; left: 50%; bottom: calc(100% + 7px); z-index: 50;
+  padding: 6px 8px; border-radius: 8px; background: var(--text); color: var(--bg);
+  content: attr(data-tooltip); font-size: 12px; font-weight: 400; line-height: 1.2;
+  white-space: nowrap; opacity: 0; pointer-events: none; transform: translate(-50%, 3px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.message-body header .message-time:hover::after { opacity: 1; transform: translate(-50%, 0); }
+.incoming-call-actions { gap: 10px; }
+.incoming-call-actions button {
+  display: inline-flex; width: auto; min-width: 94px; height: 44px; align-items: center; justify-content: center; gap: 8px;
+  padding: 0 13px; border-radius: 12px; box-shadow: none; font-size: 12px; font-weight: 650;
+}
+.incoming-call-actions .call-accept-audio { min-width: 112px; background: #5b7771; }
+.incoming-call-actions button span { white-space: nowrap; }
+
+
+/* Call surface 0.0.8 */
+.call-overlay {
+  display: flex; min-height: 220px; max-height: 280px; flex-direction: column; align-items: stretch; justify-content: space-between;
+  gap: 12px; padding: 14px 16px; border: 1px solid rgba(255,255,255,.08); border-radius: 14px;
+  background: #161514; color: #f4f0e9;
+}
+.call-banner-participants { justify-content: center; gap: 16px; }
+.call-banner-person small { color: #d2ccc2; }
+.call-banner-media { width: 100%; min-height: 90px; max-height: 140px; flex: 1 1 auto; border-color: rgba(255,255,255,.08); border-radius: 12px; background: #0f0e0e; }
+.call-banner-controls { justify-content: center; gap: 8px; margin: 0 auto; }
+.call-control-group { display: flex; align-items: center; gap: 4px; padding: 6px; border: 1px solid rgba(255,255,255,.08); border-radius: 14px; background: #211f1e; }
+.call-banner-controls .call-control { display: grid; width: 44px; height: 44px; place-items: center; border: 0; border-radius: 10px; background: transparent; color: #f4f0e9; }
+.call-banner-controls .call-control:hover { background: rgba(255,255,255,.09); }
+.call-banner-controls .call-control.danger { background: rgba(214,64,69,.25); color: #ff8b8f; }
+.call-banner-controls .call-control.call-hangup { width: 56px; height: 44px; border-radius: 14px; background: #d64045; color: white; }
+.call-banner-duration { position: absolute; right: 16px; top: 13px; color: #a9a39a; }
+.call-audio-sink { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+@media (max-width: 760px) {
+  .call-overlay { min-height: 220px; }
+  .call-banner-controls { width: 100%; justify-content: center; flex-wrap: wrap; }
+}
+
+
+.voice-room-header-actions { display: flex; align-items: center; gap: 8px; }
+.voice-room-invite { display: inline-flex; height: 36px; align-items: center; gap: 7px; padding: 0 11px; border: 1px solid rgba(255,255,255,.1); border-radius: 9px; background: #211f1e; color: #f4f0e9; cursor: pointer; font-size: 12px; }
+.voice-room-invite:hover { background: #302d2b; }
+.voice-invite-backdrop { position: fixed; inset: 0; z-index: 1500; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,.5); }
+.voice-invite-modal { display: flex; width: min(420px, calc(100vw - 32px)); max-height: 70vh; flex-direction: column; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); }
+.voice-invite-modal > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; font: 600 18px var(--font-serif); }
+.voice-invite-modal > header button { display: grid; width: 32px; height: 32px; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.voice-invite-list { display: flex; min-height: 0; flex-direction: column; gap: 4px; overflow: auto; }
+.voice-invite-list > div { display: flex; min-height: 42px; align-items: center; gap: 9px; padding: 5px 6px; border-radius: 8px; }
+.voice-invite-list > div:hover { background: var(--surface-hover); }
+.voice-invite-list > div > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.voice-invite-list > div > button { width: auto; height: 30px; padding: 0 10px; border: 0; border-radius: 8px; background: var(--accent-soft); color: var(--accent); cursor: pointer; font-size: 12px; }
+.voice-invite-status { margin: 0; color: var(--text-muted); font-size: 12px; }
+.voice-incoming-invite { width: min(440px, calc(100vw - 32px)); }
+.voice-invite-from { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+.voice-invite-from > span { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.voice-invite-from strong { font-size: 14px; }
+.voice-invite-from small { color: var(--text-muted); font-size: 12px; }
+.voice-invite-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.voice-invite-actions button { width: auto; min-width: 90px; height: 36px; padding: 0 13px; border-radius: 9px; }
+.modal-panel:has(.nexo-field) { width: min(560px, calc(100vw - 32px)); }
+.modal-panel:has(.nexo-field) > form { display: flex; flex-direction: column; gap: 16px; }
+
+
+.voice-room-grid.compact { grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); }
+.voice-room-grid.large { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.voice-room-more-wrap { position: relative; }
+.voice-room-controls .voice-room-more-wrap > button { display: flex; min-width: 76px; height: 44px; align-items: center; justify-content: center; gap: 7px; padding: 0 12px; border: 0; border-radius: 10px; background: #211f1e; color: #f4f0e9; cursor: pointer; }
+.voice-room-more-popover { position: absolute; right: 0; bottom: calc(100% + 9px); z-index: 20; display: flex; width: min(280px, calc(100vw - 48px)); flex-direction: column; gap: 14px; padding: 14px; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; background: #211f1e; color: #f4f0e9; }
+.voice-room-more-popover > div, .voice-room-more-popover > label { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; }
+.voice-room-more-popover .nexo-slider { color: #f4f0e9; }
+.voice-room-more-popover .nexo-select { min-height: 32px; background: #302d2b; color: #f4f0e9; }
+
+
+/* Native checkbox/range inputs inside legacy settings now share the Nexo control treatment. */
+.nexo-input[type="checkbox"] {
+  appearance: none; display: inline-flex; width: 36px; height: 20px; min-height: 20px; flex: 0 0 36px;
+  align-items: center; padding: 2px; border: 0; border-radius: 99px; background: var(--border-strong);
+  cursor: pointer; transition: background 150ms ease;
+}
+.nexo-input[type="checkbox"]::after { content: ''; display: block; width: 16px; height: 16px; border-radius: 50%; background: white; box-shadow: 0 1px 2px rgba(0,0,0,.18); transition: transform 150ms ease; }
+.nexo-input[type="checkbox"]:checked { background: var(--accent); }
+.nexo-input[type="checkbox"]:checked::after { transform: translateX(16px); }
+.nexo-input[type="checkbox"]:disabled { opacity: .6; cursor: not-allowed; }
+.nexo-input[type="range"] { width: 100%; min-height: 4px; height: 4px; padding: 0; border: 0; border-radius: 99px; background: var(--border); accent-color: var(--accent); }
+.nexo-input[type="color"] { width: 44px; min-height: 32px; height: 32px; padding: 2px; }
+.nexo-field .nexo-field-control .nexo-input, .nexo-field .nexo-field-control .nexo-textarea { width: 100%; }
+
+
+/* Unified Nexo tooltips (replaces browser-native title popups). */
+[data-tooltip]:not(.dock-icon):not(.message-time) { position: relative; }
+[data-tooltip]:not(.dock-icon):not(.message-time)::after {
+  position: absolute; left: 50%; bottom: calc(100% + 8px); z-index: 1800;
+  max-width: min(280px, calc(100vw - 24px)); padding: 6px 9px;
+  border: 1px solid rgba(255,255,255,.08); border-radius: 8px;
+  background: var(--text); color: var(--bg); content: attr(data-tooltip);
+  font: 500 12px/1.25 var(--font-sans); text-align: center; white-space: nowrap;
+  opacity: 0; pointer-events: none; transform: translate(-50%, 3px);
+  transition: opacity 120ms ease 400ms, transform 120ms ease 400ms;
+}
+[data-tooltip]:not(.dock-icon):not(.message-time):hover::after,
+[data-tooltip]:not(.dock-icon):not(.message-time):focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+
+
+/* Pin the account/voice area to the bottom; only the navigation list may scroll. */
+.nexo-sidebar {
+  display: flex; height: 100%; min-height: 0; flex-direction: column;
+  overflow: hidden;
+}
+.nexo-sidebar > .sidebar-scroll-area { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+.nexo-sidebar > .sidebar-user-area { flex: 0 0 auto; margin-top: auto !important; overflow: visible; }
+.nexo-sidebar .nexo-user-dock { height: 52px; min-height: 52px; flex: 0 0 52px; }
+
+.call-overlay:fullscreen { width: 100vw; height: 100vh; max-height: none; min-height: 100vh; justify-content: center; gap: 28px; padding: 48px; border: 0; border-radius: 0; background: #161514; }
+.call-overlay:fullscreen .call-banner-participants { gap: 32px; }
+.call-overlay:fullscreen .call-banner-media { max-height: 65vh; }
+.call-overlay:fullscreen .call-banner-controls { margin-top: auto; }
+
+.sidebar-voice-channel.locked .voice-channel-row { color: var(--text-faint); cursor: not-allowed; opacity: .62; }
+.sidebar-voice-channel.locked .voice-channel-row:hover { background: transparent; color: var(--text-faint); }
+
+.sidebar-voice-member.speaking > :first-child { border-radius: 50%; box-shadow: 0 0 0 2px var(--accent); }
+.voice-room-controls button:disabled { opacity: .45; cursor: not-allowed; }
+
+.call-more-wrap { position: relative; }
+.call-more-popover { position: absolute; right: 0; bottom: calc(100% + 9px); z-index: 80; display: flex; width: 270px; flex-direction: column; gap: 13px; padding: 13px; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; background: #211f1e; color: #f4f0e9; }
+.call-more-popover > div, .call-more-popover > label { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; }
+.call-more-popover .nexo-slider { color: #f4f0e9; }
+.call-more-popover .nexo-select { min-height: 32px; background: #302d2b; color: #f4f0e9; }
+.call-banner-media.compact { max-height: 100px; }
+.call-banner-media.large { max-height: 180px; }

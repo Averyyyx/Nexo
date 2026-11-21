@@ -5,6 +5,7 @@ import { Check, UserPlus, X, MessageCircle, Search, Users, Clock3 } from 'lucide
 import { apiFetch } from '../lib/api';
 import { getSocket } from '../lib/socket';
 import { Avatar } from './Avatar';
+import { Input } from './ui';
 import type { FriendPayload, FriendRecord, User } from '../types';
 
 type FriendsPanelProps = {
@@ -116,7 +117,7 @@ export function FriendsPanel({ user, onRefresh, onOpenConversation }: FriendsPan
           {view !== 'add' && (
             <div className="friends-search">
               <Search size={17} />
-              <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Поиск" aria-label="Поиск друзей" />
+              <Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Поиск" aria-label="Поиск друзей" />
             </div>
           )}
 
@@ -130,7 +131,7 @@ export function FriendsPanel({ user, onRefresh, onOpenConversation }: FriendsPan
                 <p>Введите точный логин человека. Запрос появится у него в списке ожидания.</p>
                 <form className="friends-add-form" onSubmit={handleAddFriend}>
                   <label htmlFor="friend-handle">Логин пользователя</label>
-                  <div><input id="friend-handle" value={handleQuery} onChange={(event) => setHandleQuery(event.target.value)}
+                  <div><Input id="friend-handle" value={handleQuery} onChange={(event) => setHandleQuery(event.target.value)}
                     placeholder="@username" required maxLength={25} autoFocus />
                     <button type="submit" className="primary" disabled={status.type === 'loading'}><UserPlus size={16} />Отправить запрос</button>
                   </div>
@@ -156,7 +157,7 @@ export function FriendsPanel({ user, onRefresh, onOpenConversation }: FriendsPan
                   <div className="friends-empty"><Users size={26} /><strong>{view === 'online' ? 'Сейчас никого нет в сети' : 'Здесь пока пусто'}</strong><span>{view === 'online' ? 'Когда друзья появятся в сети, они будут показаны здесь.' : 'Добавьте знакомых, чтобы начать общаться в Nexo.'}</span></div>
                 )}
                 {shownFriends.map((record) => <FriendRow key={record.id} record={record} actions={
-                  <button type="button" className="friend-message" title="Написать сообщение" aria-label="Написать сообщение"
+                  <button type="button" className="friend-message" data-tooltip="Написать сообщение" aria-label="Написать сообщение"
                     onClick={() => onOpenConversation?.({ username: record.user.username })}><MessageCircle size={17} /></button>
                 } />)}
               </motion.section>

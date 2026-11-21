@@ -19,7 +19,8 @@ import {
 import { apiFetch } from '../lib/api';
 import { getNexoSoundPreferences, NEXO_SOUND_EVENTS, playNexoSound, saveNexoSoundPreferences, type NexoSoundPreferences } from '../lib/sounds';
 import { Avatar } from './Avatar';
-import type { User } from '../types';
+import { Field, Input, Select, Textarea, Switch, Slider, Button } from './ui';
+import type { User, UserStatus } from '../types';
 import { applyTheme, isThemeChoice } from '../lib/theme';
 import { t } from '../lib/strings';
 import type { Channel, Server, ServerRole } from '../types';
@@ -36,6 +37,8 @@ type SettingsPanelProps = {
   onCheckUpdates?: () => Promise<{ status: string; version?: string; message: string; releaseNotes?: string }>;
   audioInputId?: string;
   audioOutputId?: string;
+  videoInputId?: string;
+  onVideoInputChange?: (id: string) => void;
   onAudioInputChange?: (id: string) => void;
   onAudioOutputChange?: (id: string) => void;
 };
@@ -109,14 +112,19 @@ const PERMISSION_FLAGS = [
   { label: 'Транслировать экран', value: 1 << 9 }
 ];
 
-export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', onClose, onLogout, appVersion = '0.0.7-alpha', onCheckUpdates, audioInputId = '', audioOutputId = '', onAudioInputChange, onAudioOutputChange }: SettingsPanelProps) {
+export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', onClose, onLogout, appVersion = '0.0.8-alpha', onCheckUpdates, audioInputId = '', audioOutputId = '', videoInputId = '', onVideoInputChange, onAudioInputChange, onAudioOutputChange }: SettingsPanelProps) {
   const [section, setSection] = useState<SettingsSection>(initialSection);
   const [soundPreferences, setSoundPreferences] = useState<NexoSoundPreferences>(() => getNexoSoundPreferences());
   const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
   const [audioOutputs, setAudioOutputs] = useState<MediaDeviceInfo[]>([]);
+  const [videoInputs, setVideoInputs] = useState<MediaDeviceInfo[]>([]);
   const [accountName, setAccountName] = useState(user.display_name || '');
   const [accountHandle, setAccountHandle] = useState(user.username || '');
   const [profileBio, setProfileBio] = useState(user.bio || '');
+  const [profileStatusChoice, setProfileStatusChoice] = useState<UserStatus>(user.status || 'online');
+  const [profileCustomStatus, setProfileCustomStatus] = useState(user.custom_status || '');
+  const [presenceBusy, setPresenceBusy] = useState(false);
+  const [presenceStatus, setPresenceStatus] = useState<Status>({ type: 'idle' });
   const [profileColor, setProfileColor] = useState(user.avatar_color || '#D97757');
   const [profileAvatarPreset, setProfileAvatarPreset] = useState(user.avatar_preset ?? 0);
   const [handleState, setHandleState] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
@@ -158,6 +166,7 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
       void navigator.mediaDevices?.enumerateDevices?.().then((devices) => {
         setAudioInputs(devices.filter((device) => device.kind === 'audioinput'));
         setAudioOutputs(devices.filter((device) => device.kind === 'audiooutput'));
+        setVideoInputs(devices.filter((device) => device.kind === 'videoinput'));
       }).catch(() => {});
     };
     refreshDevices();
@@ -585,7 +594,7 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
         <div className="settings-group">
           <label>
             <span>Фоновое изображение</span>
-            <input
+            <Input
               type="url"
               placeholder="https://example.com/wallpaper.png"
               value={settings.background_url}
@@ -598,7 +607,7 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
           </label>
         </div>
         <label className="toggle">
-          <input
+          <Input
             type="checkbox"
             checked={settings.reduce_motion}
             onChange={(event) => saveAppearance({ reduce_motion: event.target.checked })}
@@ -677,13 +686,13 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
             return (
               <article key={role.id} className="role-card" style={{ borderColor: draft.color }}>
                 <div className="role-header">
-                  <input
+                  <Input
                     value={draft.name}
                     onChange={(event) =>
                       setRoleDrafts((prev) => ({ ...prev, [role.id]: { ...draft, name: event.target.value } }))
                     }
                   />
-                  <input
+                  <Input
                     type="color"
                     value={draft.color}
                     onChange={(event) =>
@@ -694,7 +703,7 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
                 <div className="permissions-grid">
                   {PERMISSION_FLAGS.map((flag) => (
                     <label key={`${role.id}-${flag.value}`}>
-                      <input
+                      <Input
                         type="checkbox"
                         checked={Boolean(draft.permissions & flag.value)}
                         onChange={() => togglePermission(role.id, flag.value)}
@@ -753,7 +762,7 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
                 </header>
                 <label>
                   <span>Topic</span>
-                  <input
+                  <Input
                     value={draft.topic || ''}
                     onChange={(event) => updateChannelDraft(channel.id, { topic: event.target.value })}
                   />
@@ -762,7 +771,7 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
                   <>
                     <label>
                       <span>Slow mode (сек)</span>
-                      <input
+                      <Input
                         type="number"
                         min={0}
                         max={21600}
@@ -773,7 +782,7 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
                       />
                     </label>
                     <label className="toggle">
-                      <input
+                      <Input
                         type="checkbox"
                         checked={draft.is_nsfw}
                         onChange={(event) => updateChannelDraft(channel.id, { is_nsfw: event.target.checked })}
@@ -786,7 +795,7 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
                   <>
                     <label>
                       <span>Bitrate</span>
-                      <input
+                      <Input
                         type="number"
                         min={8000}
                         max={384000}
@@ -796,7 +805,7 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
                     </label>
                     <label>
                       <span>Лимит пользователей</span>
-                      <input
+                      <Input
                         type="number"
                         min={0}
                         max={99}
@@ -808,7 +817,7 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
                 )}
                 <label>
                   <span>Soundscape</span>
-                  <select
+                  <Select
                     value={draft.soundscape || ''}
                     onChange={(event) => updateChannelDraft(channel.id, { soundscape: event.target.value })}
                   >
@@ -817,7 +826,7 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
                         {theme || 'Выключено'}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
                 <button className="ghost" onClick={() => saveChannel(channel.id)}>
                   <Save size={14} />
@@ -852,7 +861,7 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
                       );
                     })}
                   <div className="override-form">
-                    <select
+                    <Select
                       value={overrideDraft.roleId || ''}
                       onChange={(event) =>
                         updateOverrideDraft(channel.id, {
@@ -866,12 +875,12 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
                           {role.name}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                     <div className="override-flag-grid">
                       {CHANNEL_OVERRIDE_FLAGS.map((flag) => (
                         <div key={`${channel.id}-allow-${flag.value}`}>
                           <label>
-                            <input
+                            <Input
                               type="checkbox"
                               checked={Boolean(overrideDraft.allow & flag.value)}
                               onChange={() =>
@@ -884,7 +893,7 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
                             Allow {flag.label}
                           </label>
                           <label>
-                            <input
+                            <Input
                               type="checkbox"
                               checked={Boolean(overrideDraft.deny & flag.value)}
                               onChange={() =>
@@ -950,11 +959,11 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
                 </header>
                 <label>
                   <span>Название</span>
-                  <input value={profileDraft.name} onChange={(e) => setProfileDraft((prev) => ({ ...prev, name: e.target.value }))} />
+                  <Input value={profileDraft.name} onChange={(e) => setProfileDraft((prev) => ({ ...prev, name: e.target.value }))} />
                 </label>
                 <label>
                   <span>Описание</span>
-                  <textarea
+                  <Textarea
                     rows={3}
                     value={profileDraft.description}
                     onChange={(e) => setProfileDraft((prev) => ({ ...prev, description: e.target.value }))}
@@ -962,7 +971,7 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
                 </label>
                 <label>
                   <span>Иконка (URL)</span>
-                  <input value={profileDraft.icon} onChange={(e) => setProfileDraft((prev) => ({ ...prev, icon: e.target.value }))} />
+                  <Input value={profileDraft.icon} onChange={(e) => setProfileDraft((prev) => ({ ...prev, icon: e.target.value }))} />
                 </label>
                 <button className="ghost" onClick={updateServerProfile}>
                   <Save size={14} />
@@ -1029,7 +1038,7 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
           </div>
         )}
         <label className="update-auto-download">
-          <input type="checkbox" checked={autoDownloadUpdates} onChange={(event) => void changeAutoDownload(event.target.checked)} />
+          <Input type="checkbox" checked={autoDownloadUpdates} onChange={(event) => void changeAutoDownload(event.target.checked)} />
           <span>Автоматически скачивать обновления</span>
         </label>
         {updateStatus.message && <p className={`status ${updateStatus.type}`}>{updateStatus.message}</p>}
@@ -1206,16 +1215,16 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
           <div><strong>{user.display_name || user.username}</strong><small>@{user.username} · #{user.discriminator || '0001'}</small></div>
         </div>
         <div className="settings-group">
-          <label><span>Email</span><input value={user.email} readOnly disabled /></label>
+          <label><span>Email</span><Input value={user.email} readOnly disabled /></label>
           <small className="muted">Изменение адреса потребует подтверждения почты; почтовый сервис пока не подключён.</small>
         </div>
         <div className="settings-group">
           <h3>Изменить пароль</h3>
-          <label><span>Текущий пароль</span><input type="password" autoComplete="current-password" value={passwordDraft.current}
+          <label><span>Текущий пароль</span><Input type="password" autoComplete="current-password" value={passwordDraft.current}
             onChange={(event) => setPasswordDraft((current) => ({ ...current, current: event.target.value }))} /></label>
-          <label><span>Новый пароль</span><input type="password" autoComplete="new-password" maxLength={128} value={passwordDraft.next}
+          <label><span>Новый пароль</span><Input type="password" autoComplete="new-password" maxLength={128} value={passwordDraft.next}
             onChange={(event) => setPasswordDraft((current) => ({ ...current, next: event.target.value }))} /></label>
-          <label><span>Повторите новый пароль</span><input type="password" autoComplete="new-password" maxLength={128} value={passwordDraft.confirm}
+          <label><span>Повторите новый пароль</span><Input type="password" autoComplete="new-password" maxLength={128} value={passwordDraft.confirm}
             onChange={(event) => setPasswordDraft((current) => ({ ...current, confirm: event.target.value }))} /></label>
           <button type="button" className="primary" onClick={() => void updatePassword()}>Изменить пароль</button>
           {passwordStatus.message && <p className={`status ${passwordStatus.type}`}>{passwordStatus.message}</p>}
@@ -1224,7 +1233,7 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
           <h3>Двухфакторная защита</h3>
           <p className="muted">{user.twofa_enabled ? 'Дополнительная проверка включена.' : 'Защитите аккаунт одноразовым кодом из приложения-аутентификатора.'}</p>
           {twoFactorQr && <img className="two-factor-qr" src={twoFactorQr} alt="QR-код для настройки двухфакторной защиты" />}
-          {(!user.twofa_enabled || twoFactorQr) && <label><span>Шестизначный код</span><input inputMode="numeric" maxLength={6} value={twoFactorToken}
+          {(!user.twofa_enabled || twoFactorQr) && <label><span>Шестизначный код</span><Input inputMode="numeric" maxLength={6} value={twoFactorToken}
             onChange={(event) => setTwoFactorToken(event.target.value.replace(/\D/g, '').slice(0, 6))} /></label>}
           {!user.twofa_enabled
             ? <button type="button" className="primary" onClick={() => twoFactorQr ? void confirmTwoFactor('enable') : void startTwoFactor()}>
@@ -1241,6 +1250,26 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
     );
   }
 
+  async function savePresence() {
+    setPresenceBusy(true);
+    setPresenceStatus({ type: 'loading', message: 'Сохраняем статус…' });
+    try {
+      const response = await apiFetch('/api/profile/status', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: profileStatusChoice, customStatus: profileCustomStatus.trim().slice(0, 60) })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.message || 'Не удалось сохранить статус.');
+      onUserUpdate?.(payload.user);
+      setPresenceStatus({ type: 'success', message: 'Статус сохранён' });
+    } catch (error) {
+      setPresenceStatus({ type: 'error', message: (error as Error).message });
+    } finally {
+      setPresenceBusy(false);
+    }
+  }
+
   function renderProfileSettings() {
     return (
       <div className="settings-section profile-settings">
@@ -1252,21 +1281,30 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
             <p>{profileBio || 'Описание профиля пока пустое.'}</p></div>
         </div>
         <div className="settings-group">
-          <label><span>Отображаемое имя</span><input value={accountName} maxLength={32}
-            onChange={(event) => setAccountName(event.target.value)} /></label>
-          <label><span>Логин @handle</span><input value={accountHandle} maxLength={24}
-            onChange={(event) => setAccountHandle(event.target.value.toLowerCase())} /></label>
+          <h3>Статус</h3>
+          <Field label="Состояние"><Select value={profileStatusChoice} onChange={(event) => setProfileStatusChoice(event.target.value as UserStatus)}>
+              <option value="online">В сети</option><option value="idle">Отошёл</option><option value="dnd">Не беспокоить</option><option value="invisible">Невидимка</option>
+            </Select></Field>
+          <Field label="Свой статус"><Input value={profileCustomStatus} maxLength={60} placeholder="Над чем работаете?" onChange={(event) => setProfileCustomStatus(event.target.value)} /></Field>
+          <small className="muted">{profileCustomStatus.length}/60</small>
+          <button type="button" className="secondary" onClick={() => void savePresence()} disabled={presenceBusy}>
+            {presenceBusy ? 'Сохраняем…' : 'Сохранить статус'}
+          </button>
+          {presenceStatus.message && <p className={`status ${presenceStatus.type}`}>{presenceStatus.message}</p>}
+        </div>
+        <div className="settings-group">
+          <Field label="Отображаемое имя"><Input value={accountName} maxLength={32} onChange={(event) => setAccountName(event.target.value)} /></Field>
+          <Field label="Логин @handle"><Input value={accountHandle} maxLength={24} onChange={(event) => setAccountHandle(event.target.value.toLowerCase())} /></Field>
           <small className={`handle-availability ${handleState}`}>{handleState === 'checking' ? 'Проверяем…' : handleHint}</small>
           <small className="muted">Логин можно менять раз в 14 дней. Отображаемое имя — не чаще одного раза в минуту.</small>
-          <label><span>О себе</span><textarea value={profileBio} maxLength={200} rows={4}
-            onChange={(event) => setProfileBio(event.target.value)} placeholder="Расскажите о себе…" /></label>
+          <Field label="О себе"><Textarea value={profileBio} maxLength={200} rows={4} onChange={(event) => setProfileBio(event.target.value)} placeholder="Расскажите о себе…" /></Field>
           <small className="muted">{profileBio.length}/200</small>
         </div>
         <div className="settings-group">
           <h3>Аватар</h3>
           <div className="avatar-settings-row"><Avatar user={{ ...user, avatar_url: avatarPreview || user.avatar_url }} size={52} />
             <label className="file-upload-button"><Upload size={15} />Загрузить изображение
-              <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={avatarBusy}
+              <Input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={avatarBusy}
                 onChange={(event) => { const file = event.target.files?.[0]; void uploadAvatar(file); event.currentTarget.value = ''; }} />
             </label>
             {user.avatar_url && <button type="button" className="ghost danger" onClick={() => void removeAvatar()} disabled={avatarBusy}>Удалить</button>}
@@ -1306,18 +1344,15 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
         <h2>Устройства</h2>
         <p className="muted">Выберите устройства, которые Nexo будет использовать для микрофона и вывода звука. Список обновляется при подключении или отключении оборудования.</p>
         <div className="settings-group voice-device-list">
-          <label className="settings-device-row"><span><strong>Устройство ввода</strong><small>Микрофон для звонков</small></span>
-            <select value={audioInputId} onChange={(event) => onAudioInputChange?.(event.target.value)}>
-              <option value="">Системное устройство по умолчанию</option>
-              {audioInputs.map((device, index) => <option key={device.deviceId || index} value={device.deviceId}>{device.label || `Микрофон ${index + 1}`}</option>)}
-            </select>
-          </label>
-          <label className="settings-device-row"><span><strong>Устройство вывода</strong><small>Наушники или колонки для звонков</small></span>
-            <select value={audioOutputId} onChange={(event) => onAudioOutputChange?.(event.target.value)}>
-              <option value="">Системное устройство по умолчанию</option>
-              {audioOutputs.map((device, index) => <option key={device.deviceId || index} value={device.deviceId}>{device.label || `Устройство вывода ${index + 1}`}</option>)}
-            </select>
-          </label>
+          <div className="settings-device-row"><span><strong>Устройство ввода</strong><small>Микрофон для звонков</small></span>
+            <Select value={audioInputId} onChange={(event) => onAudioInputChange?.(event.target.value)}><option value="">Системное устройство по умолчанию</option>{audioInputs.map((device, index) => <option key={device.deviceId || index} value={device.deviceId}>{device.label || `Микрофон ${index + 1}`}</option>)}</Select>
+          </div>
+          <div className="settings-device-row"><span><strong>Устройство вывода</strong><small>Наушники или колонки для звонков</small></span>
+            <Select value={audioOutputId} onChange={(event) => onAudioOutputChange?.(event.target.value)}><option value="">Системное устройство по умолчанию</option>{audioOutputs.map((device, index) => <option key={device.deviceId || index} value={device.deviceId}>{device.label || `Устройство вывода ${index + 1}`}</option>)}</Select>
+          </div>
+          <div className="settings-device-row"><span><strong>Камера</strong><small>Устройство для видеозвонков и голосовых каналов</small></span>
+            <Select value={videoInputId} onChange={(event) => onVideoInputChange?.(event.target.value)}><option value="">Системная камера по умолчанию</option>{videoInputs.map((device, index) => <option key={device.deviceId || index} value={device.deviceId}>{device.label || `Камера ${index + 1}`}</option>)}</Select>
+          </div>
         </div>
         <p className="muted">Названия устройств могут появиться только после предоставления разрешения на доступ к микрофону.</p>
       </div>
@@ -1332,16 +1367,16 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
         <p className="muted">Единая звуковая палитра Nexo. Каждый сигнал можно отдельно отключить и прослушать.</p>
         <div className="settings-group sound-settings-list">
           <label className="settings-toggle-row"><span><strong>Все звуки</strong><small>Главный переключатель звуков Nexo</small></span>
-            <input type="checkbox" checked={soundPreferences.enabled} onChange={(event) => changeSoundPreference('enabled', event.target.checked)} /></label>
+            <Input type="checkbox" checked={soundPreferences.enabled} onChange={(event) => changeSoundPreference('enabled', event.target.checked)} /></label>
           <label className="settings-toggle-row"><span><strong>Разрешать звонки в режиме «Не беспокоить»</strong><small>Входящая мелодия будет звучать, если эта опция включена</small></span>
-            <input type="checkbox" checked={soundPreferences.allowCallsInDnd} onChange={(event) => changeSoundPreference('allowCallsInDnd', event.target.checked)} disabled={!soundPreferences.enabled} /></label>
+            <Input type="checkbox" checked={soundPreferences.allowCallsInDnd} onChange={(event) => changeSoundPreference('allowCallsInDnd', event.target.checked)} disabled={!soundPreferences.enabled} /></label>
         </div>
         <div className="settings-group sound-volume-list">
           <label className="sound-volume"><span><strong>Громкость звуков</strong><small>{Math.round(soundPreferences.volume * 100)}%</small></span>
-            <input type="range" min="0" max="1" step="0.02" value={soundPreferences.volume}
+            <Input type="range" min="0" max="1" step="0.02" value={soundPreferences.volume}
               onChange={(event) => changeSoundPreference('volume', Number(event.target.value))} disabled={!soundPreferences.enabled} /></label>
           <label className="sound-volume"><span><strong>Громкость мелодии звонка</strong><small>{Math.round(soundPreferences.ringtoneVolume * 100)}%</small></span>
-            <input type="range" min="0" max="1" step="0.02" value={soundPreferences.ringtoneVolume}
+            <Input type="range" min="0" max="1" step="0.02" value={soundPreferences.ringtoneVolume}
               onChange={(event) => changeSoundPreference('ringtoneVolume', Number(event.target.value))} disabled={!soundPreferences.enabled} /></label>
         </div>
         <div className="settings-group sound-event-list">
@@ -1349,7 +1384,7 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
             <div className="sound-event-row" key={event.key}>
               <span><strong>{event.label}</strong><small>{event.description}</small></span>
               <label className="sound-event-toggle" aria-label={`Включить звук: ${event.label}`}>
-                <input type="checkbox" checked={soundPreferences.events[event.key]}
+                <Input type="checkbox" checked={soundPreferences.events[event.key]}
                   onChange={(change) => changeSoundPreference('events', { ...soundPreferences.events, [event.key]: change.target.checked })}
                   disabled={!soundPreferences.enabled} />
               </label>
@@ -1372,7 +1407,7 @@ export function SettingsPanel({ user, onUserUpdate, initialSection = 'account', 
         <p className="muted">Управляйте движением интерфейса и визуальными эффектами.</p>
         {settings ? (
           <label className="settings-toggle-row"><span><strong>Уменьшить анимации</strong><small>Отключает декоративные переходы и анимацию появления элементов</small></span>
-            <input type="checkbox" checked={settings.reduce_motion} onChange={(event) => saveAppearance({ reduce_motion: event.target.checked })} disabled={saving} /></label>
+            <Input type="checkbox" checked={settings.reduce_motion} onChange={(event) => saveAppearance({ reduce_motion: event.target.checked })} disabled={saving} /></label>
         ) : <p className="muted">Загружаем настройки…</p>}
         {status.message && <p className={`status ${status.type}`}>{status.message}</p>}
       </div>

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   workflow_run:
     workflows:
-      - Nexo 0.0.7 validation
+      - Nexo 0.0.8 validation
     types:
       - completed
     branches:

@@ -53,6 +53,8 @@ export type VoiceState = {
   self_mute: boolean;
   self_video: boolean;
   suppress: boolean;
+  canSpeak?: boolean;
+  speaking?: boolean;
   request_to_speak_timestamp: string | null;
 };
 
@@ -123,6 +125,7 @@ export type Conversation = {
   title: string | null;
   participants: User[];
   counterpart?: User | null;
+  last_message?: Message | null;
   updated_at: string;
 };
 
@@ -137,6 +140,9 @@ export type Channel = {
   is_nsfw: boolean;
   bitrate: number;
   user_limit: number;
+  canConnect?: boolean;
+  canSpeak?: boolean;
+  canStream?: boolean;
   soundscape: string;
   overrides?: ChannelPermissionOverride[];
   created_at: string;

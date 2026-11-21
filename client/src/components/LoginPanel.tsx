@@ -5,6 +5,7 @@ import { Github } from 'lucide-react';
 import { API_BASE, apiFetch } from '../lib/api';
 import { t } from '../lib/strings';
 import type { User } from '../types';
+import { Field, Input, Switch } from './ui';
 
 type AuthMode = 'login' | 'register';
 type Status = { type: 'idle' | 'loading' | 'success' | 'error'; message?: string };
@@ -103,32 +104,23 @@ export function LoginPanel({ onSuccess }: LoginPanelProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
         >
-          <label>
-            <span>{t('email')}</span>
-            <input type="email" placeholder="you@example.com" value={email}
-              onChange={(event) => setEmail(event.target.value)} autoComplete="email" required />
-          </label>
-          <label>
-            <span>{t('password')}</span>
-            <input type="password" placeholder="••••••••" value={password}
+          <Field label={t('email')}><Input type="email" placeholder="you@example.com" value={email}
+              onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></Field>
+          <Field label={t('password')}><Input type="password" placeholder="••••••••" value={password}
               onChange={(event) => setPassword(event.target.value)} maxLength={128}
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required />
-          </label>
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required /></Field>
           {mode === 'register' && <div className={`password-strength score-${passwordScore ?? 0}`} aria-live="polite">
             <span>{passwordChecking ? 'Проверяем надёжность…' : passwordScore === null ? 'Оценка пароля' : ['Слабый', 'Слабый', 'Средний', 'Хороший', 'Сильный'][Math.max(0, Math.min(4, passwordScore))]}</span>
             <div className="password-strength-track"><i style={{ width: `${passwordScore === null ? 0 : (passwordScore + 1) * 20}%` }} /></div>
           </div>}
           {mode === 'register' && (
-            <label>
-              <span>Повторите пароль</span>
-              <input type="password" placeholder="••••••••" value={confirmPassword}
+            <Field label="Повторите пароль"><Input type="password" placeholder="••••••••" value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
-                autoComplete="new-password" required />
-            </label>
+                autoComplete="new-password" required /></Field>
           )}
           {mode === 'login' && (
             <label className="remember">
-              <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+              <Switch checked={remember} onChange={setRemember} label={t('rememberDevice')} />
               <span>{t('rememberDevice')}</span>
             </label>
           )}

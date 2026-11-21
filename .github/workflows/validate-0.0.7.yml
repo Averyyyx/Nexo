@@ -1,4 +1,4 @@
-name: Nexo 0.0.7 validation
+name: Nexo 0.0.8 validation
 
 on:
   pull_request:
@@ -34,7 +34,7 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: Nexo-0.0.7-alpha-Windows
+          name: Nexo-0.0.8-alpha-Windows
           path: dist/*.exe
           if-no-files-found: error
           retention-days: 10

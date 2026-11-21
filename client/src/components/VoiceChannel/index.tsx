@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { FC } from 'react';
 import type { VoiceState } from '../../types';
+import { Input, Select } from '../ui';
 
 interface ParticipantUser {
   id: number;
@@ -172,7 +173,7 @@ export const VoiceChannel: FC<VoiceChannelProps> = ({
                   {voiceState.mute && ' 🔇'}
                 </div>
                 <div className="flex items-center mt-1">
-                  <input
+                  <Input
                     type="range"
                     min="0"
                     max="1"
@@ -265,7 +266,7 @@ export const VoiceChannel: FC<VoiceChannelProps> = ({
             {isScreenSharing && (
               <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-gray-800 rounded-lg shadow-lg p-2">
                 <div className="text-xs text-gray-300 mb-1">Качество видео</div>
-                <select
+                <Select
                   value={videoQuality}
                   onChange={(e) => handleVideoQualityChange(e.target.value)}
                   className="bg-gray-700 text-white text-sm rounded p-1 w-full"
@@ -274,7 +275,7 @@ export const VoiceChannel: FC<VoiceChannelProps> = ({
                   <option value="480p">480p (SD)</option>
                   <option value="720p">720p (HD)</option>
                   <option value="1080p">1080p (Full HD)</option>
-                </select>
+                </Select>
               </div>
             )}
           </div>

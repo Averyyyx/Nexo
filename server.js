@@ -476,7 +476,8 @@ db.prepare(`
 ensureChannelColumn('slow_mode_seconds', 'slow_mode_seconds INTEGER DEFAULT 0');
 ensureChannelColumn('is_nsfw', 'is_nsfw INTEGER DEFAULT 0');
 ensureChannelColumn('bitrate', 'bitrate INTEGER DEFAULT 64000');
-ensureChannelColumn('user_limit', 'user_limit INTEGER DEFAULT 0');
+ensureChannelColumn('user_limit', 'user_limit INTEGER DEFAULT 8');
+db.prepare('UPDATE channels SET user_limit = 8 WHERE user_limit IS NULL OR user_limit = 0').run();
 ensureChannelColumn('soundscape', "soundscape TEXT DEFAULT ''");
 
 db.prepare(`
@@ -708,6 +709,9 @@ db.prepare(`
   )
 `).run();
 
+// Voice sessions are ephemeral: never restore ghost participants after a process restart.
+db.prepare('DELETE FROM voice_sessions').run();
+
 const selectUserByEmail = db.prepare('SELECT * FROM users WHERE email = ?');
 const selectUserById = db.prepare('SELECT * FROM users WHERE id = ?');
 const insertUser = db.prepare('INSERT INTO users (email, username, password_hash, avatar_url, email_verified, twofa_enabled, twofa_secret) VALUES (?, ?, ?, ?, ?, ?, ?)');
@@ -796,6 +800,11 @@ const listMessages = db.prepare(`
   ORDER BY m.id DESC
   LIMIT ?
   OFFSET ?
+`);
+const selectLastMessageForConversation = db.prepare(`
+  SELECT m.*, u.username, u.display_name, u.avatar_url, u.avatar_color, u.avatar_preset
+  FROM messages m JOIN users u ON u.id = m.author_id
+  WHERE m.conversation_id = ? ORDER BY m.id DESC LIMIT 1
 `);
 const listFriendships = db.prepare('SELECT * FROM friendships WHERE requester_id = ? OR addressee_id = ?');
 const insertAttachmentRecord = db.prepare(`
@@ -974,6 +983,10 @@ const PERMISSIONS = {
   PRIORITY_SPEAKER: 1 << 10
 };
 
+// Existing default community roles receive the baseline permissions needed for voice rooms.
+db.prepare('UPDATE server_roles SET permissions = permissions | ? WHERE is_default = 1')
+  .run((1 << 7) | (1 << 8) | (1 << 9));
+
 function computeBasePermissions(serverId, userId, cachedRoles = null) {
   const membership = selectServerMember.get(serverId, userId);
   if (!membership) return 0;
@@ -1063,7 +1076,7 @@ function seedDevAccount() {
       null
     );
     user = selectUserById.get(result.lastInsertRowid);
-    markProfile.run('Nexo Dev', user.username, '0001', '', '#D97757', 'Nexo Dev', user.username, user.id);
+    markProfile.run('Nexo Dev', user.username, '0001', '', '#D97757', 0, 0, 'Nexo Dev', user.username, user.id);
     user = selectUserById.get(user.id);
 
     if (configuredPassword) {
@@ -1464,11 +1477,89 @@ io.on('connection', (socket) => {
 
   socket.on('channel:join', ({ serverId, channelId }) => {
     try {
-      ensureChannelAccess(Number(serverId), Number(channelId), socket.user.id);
+      const { channel, permissions } = ensureChannelAccess(Number(serverId), Number(channelId), socket.user.id);
+      if (channel.type === 'voice' && !hasPermission(permissions, PERMISSIONS.VIEW_CHANNEL | PERMISSIONS.CONNECT_VOICE)) {
+        throw new Error('Недостаточно прав для подключения к голосовому каналу.');
+      }
       socket.join(getChannelRoom(channelId));
+      if (channel.type === 'voice') {
+        const session = db.prepare('SELECT id FROM voice_sessions WHERE channel_id = ? AND user_id = ?').get(Number(channelId), socket.user.id);
+        if (session) socket.emit('voice:peers', {
+          channelId: Number(channelId),
+          peers: listVoiceParticipants(Number(channelId)).filter((participant) => participant.user.id !== socket.user.id)
+        });
+      }
     } catch (error) {
       socket.emit('error', { message: error.message });
     }
+  });
+
+  socket.on('voice:invite', ({ serverId, channelId, to }) => {
+    const safeServerId = Number(serverId);
+    const safeChannelId = Number(channelId);
+    const recipientId = Number(to);
+    if (![safeServerId, safeChannelId, recipientId].every(Number.isInteger) || recipientId === socket.user.id) return;
+    try {
+      const { channel, server, permissions } = ensureChannelAccess(safeServerId, safeChannelId, socket.user.id);
+      if (channel.type !== 'voice' || !hasPermission(permissions, PERMISSIONS.CONNECT_VOICE)) {
+        return socket.emit('error', { message: 'Недостаточно прав для приглашения в голосовой канал.' });
+      }
+      const activeSession = db.prepare('SELECT id FROM voice_sessions WHERE channel_id = ? AND user_id = ?').get(safeChannelId, socket.user.id);
+      if (!activeSession) return socket.emit('error', { message: 'Сначала подключитесь к голосовому каналу.' });
+      const recipient = selectServerMember.get(safeServerId, recipientId);
+      if (!recipient) return socket.emit('error', { message: 'Пригласить можно только участника этого пространства.' });
+      try {
+        const recipientAccess = ensureChannelAccess(safeServerId, safeChannelId, recipientId);
+        if (!hasPermission(recipientAccess.permissions, PERMISSIONS.VIEW_CHANNEL | PERMISSIONS.CONNECT_VOICE)) {
+          return socket.emit('error', { message: 'У участника нет доступа к этому голосовому каналу.' });
+        }
+      } catch { return socket.emit('error', { message: 'У участника нет доступа к этому каналу.' }); }
+      io.to(getUserRoom(recipientId)).emit('voice:invite', {
+        serverId: safeServerId, channelId: safeChannelId, serverName: server.name,
+        channelName: channel.name, from: socket.user.id, user: sanitizeUser(socket.user)
+      });
+    } catch (error) { socket.emit('error', { message: error.message }); }
+  });
+
+  socket.on('voice:invite-response', ({ to, channelId, accepted }) => {
+    const recipientId = Number(to);
+    const safeChannelId = Number(channelId);
+    if (!Number.isInteger(recipientId) || !Number.isInteger(safeChannelId)) return;
+    io.to(getUserRoom(recipientId)).emit('voice:invite-response', {
+      channelId: safeChannelId, from: socket.user.id, accepted: Boolean(accepted)
+    });
+  });
+
+  socket.on('voice:signal', ({ channelId, to, payload }) => {
+    const safeChannelId = Number(channelId);
+    const recipientId = Number(to);
+    if (!Number.isInteger(safeChannelId) || !Number.isInteger(recipientId) || !payload) return;
+    try {
+      const serverId = Number(db.prepare('SELECT server_id FROM channels WHERE id = ?').get(safeChannelId)?.server_id);
+      const access = ensureChannelAccess(serverId, safeChannelId, socket.user.id);
+      if (!hasPermission(access.permissions, PERMISSIONS.VIEW_CHANNEL | PERMISSIONS.CONNECT_VOICE)) return socket.emit('error', { message: 'Недостаточно прав для голосового канала.' });
+      if (typeof payload.sdp === 'string' && payload.sdp.includes('m=video') && !hasPermission(access.permissions, PERMISSIONS.STREAM)) {
+        return socket.emit('error', { message: 'У вас нет права передавать видео или экран в этом канале.' });
+      }
+      const sender = db.prepare('SELECT id FROM voice_sessions WHERE channel_id = ? AND user_id = ?').get(safeChannelId, socket.user.id);
+      const recipient = db.prepare('SELECT id FROM voice_sessions WHERE channel_id = ? AND user_id = ?').get(safeChannelId, recipientId);
+      if (!sender || !recipient) return socket.emit('error', { message: 'Участник больше не находится в голосовом канале.' });
+      const encodedSize = Buffer.byteLength(JSON.stringify(payload), 'utf8');
+      if (encodedSize > 256 * 1024) return socket.emit('error', { message: 'Слишком большой сигнал WebRTC.' });
+      io.to(getUserRoom(recipientId)).emit('voice:signal', { channelId: safeChannelId, from: socket.user.id, payload });
+    } catch (error) {
+      socket.emit('error', { message: error.message });
+    }
+  });
+
+  socket.on('disconnect', () => {
+    const sessions = db.prepare('SELECT channel_id FROM voice_sessions WHERE user_id = ?').all(socket.user.id);
+    if (!sessions.length) return;
+    deleteVoiceSessionsForUser.run(socket.user.id);
+    sessions.forEach(({ channel_id }) => {
+      io.to(getChannelRoom(channel_id)).emit('voice:left', { channelId: channel_id, userId: socket.user.id });
+      broadcastVoiceState(channel_id);
+    });
   });
 
   socket.on('channel:leave', (channelId) => {
@@ -1751,6 +1842,7 @@ function serializeConversation(conversation, currentUserId) {
     title: conversation.title || (counterpart?.display_name || counterpart?.username),
     participants,
     counterpart,
+    last_message: serializeMessage(selectLastMessageForConversation.get(conversation.id)),
     updated_at: conversation.updated_at
   };
 }
@@ -1823,7 +1915,7 @@ function ensureChannelAccess(serverId, channelId, userId) {
   return { server, membership, channel, permissions };
 }
 
-function serializeChannel(channel) {
+function serializeChannel(channel, currentUserId = null) {
   if (!channel) return null;
   const overrides = selectOverridesForChannel.all(channel.id).map((override) => ({
     target_type: override.target_type,
@@ -1843,6 +1935,16 @@ function serializeChannel(channel) {
     bitrate: channel.bitrate || 64000,
     user_limit: channel.user_limit || 0,
     soundscape: channel.soundscape || '',
+    ...(channel.type === 'voice' && Number.isInteger(currentUserId) ? (() => {
+      try {
+        const access = ensureChannelAccess(channel.server_id, channel.id, currentUserId);
+        return {
+          canConnect: hasPermission(access.permissions, PERMISSIONS.VIEW_CHANNEL | PERMISSIONS.CONNECT_VOICE),
+          canSpeak: hasPermission(access.permissions, PERMISSIONS.SPEAK_VOICE),
+          canStream: hasPermission(access.permissions, PERMISSIONS.STREAM)
+        };
+      } catch { return { canConnect: false, canSpeak: false, canStream: false }; }
+    })() : {}),
     overrides,
     created_at: channel.created_at
   };
@@ -1850,7 +1952,7 @@ function serializeChannel(channel) {
 
 function serializeServerEntity(server, currentUserId) {
   if (!server) return null;
-  const channels = listChannelsForServer.all(server.id).map(serializeChannel);
+  const channels = listChannelsForServer.all(server.id).map((channel) => serializeChannel(channel, currentUserId));
   const roles = selectRolesForServer.all(server.id).map((role) => ({
     id: role.id,
     name: role.name,
@@ -1976,18 +2078,29 @@ function updateServerSettingsRecord(serverId, payload) {
 }
 
 function listVoiceParticipants(channelId) {
-  return selectVoiceSessionsByChannel.all(channelId).map((session) => ({
-    user: {
-      id: session.user_id,
-      username: session.username,
-      display_name: session.display_name,
-      avatar_url: session.avatar_url,
-      avatar_color: session.avatar_color || '#D97757'
-    },
-    muted: Boolean(session.muted),
-    deafened: Boolean(session.deafened),
-    joined_at: session.joined_at
-  }));
+  return selectVoiceSessionsByChannel.all(channelId).map((session) => {
+    let canSpeak = false;
+    let canStream = false;
+    try {
+      const access = ensureChannelAccess(session.server_id, channelId, session.user_id);
+      canSpeak = hasPermission(access.permissions, PERMISSIONS.SPEAK_VOICE);
+      canStream = hasPermission(access.permissions, PERMISSIONS.STREAM);
+    } catch {}
+    return {
+      user: {
+        id: session.user_id,
+        username: session.username,
+        display_name: session.display_name,
+        avatar_url: session.avatar_url,
+        avatar_color: session.avatar_color || '#D97757'
+      },
+      muted: Boolean(session.muted),
+      deafened: Boolean(session.deafened),
+      canSpeak,
+      canStream,
+      joined_at: session.joined_at
+    };
+  });
 }
 
 function broadcastVoiceState(channelId) {
@@ -2316,7 +2429,7 @@ if (githubReady) {
               ? generateUniqueHandle(profile.username)
               : user.username;
             const preferredName = profile.displayName || profile.username || user.email.split('@')[0];
-            markProfile.run(preferredName, desiredHandle, randomDiscriminator(), user.bio || '', user.avatar_color && user.avatar_color !== '#D97757' ? user.avatar_color : defaultAvatarColor(desiredHandle), preferredName, desiredHandle, user.id);
+            markProfile.run(preferredName, desiredHandle, randomDiscriminator(), user.bio || '', user.avatar_color && user.avatar_color !== '#D97757' ? user.avatar_color : defaultAvatarColor(desiredHandle), Number.isInteger(user.avatar_preset) ? user.avatar_preset : 0, Number.isInteger(user.avatar_preset) ? user.avatar_preset : 0, preferredName, desiredHandle, user.id);
             user = selectUserById.get(user.id);
           }
 
@@ -2788,7 +2901,7 @@ app.post('/api/servers', ensureAuthenticated, (req, res) => {
       'Community',
       '#a78bfa',
       0,
-      PERMISSIONS.VIEW_CHANNEL | PERMISSIONS.SEND_MESSAGES,
+      PERMISSIONS.VIEW_CHANNEL | PERMISSIONS.SEND_MESSAGES | PERMISSIONS.CONNECT_VOICE | PERMISSIONS.SPEAK_VOICE | PERMISSIONS.STREAM,
       1
     );
     insertChannel.run(result.lastInsertRowid, 'text', 'general', 'Welcome to your server', 0);
@@ -2941,7 +3054,10 @@ app.post('/api/servers/:serverId/channels', ensureAuthenticated, (req, res) => {
   try {
     ensureServerOwnership(serverId, req.user.id);
     const existingCount = listChannelsForServer.all(serverId).length;
-    insertChannel.run(serverId, normalizedType, trimmedName, topic.slice(0, 240), existingCount);
+    const created = insertChannel.run(serverId, normalizedType, trimmedName, topic.slice(0, 240), existingCount);
+    const requestedLimit = Number(req.body?.userLimit);
+    const userLimit = Number.isInteger(requestedLimit) ? Math.min(8, Math.max(2, requestedLimit)) : 8;
+    if (normalizedType === 'voice') db.prepare('UPDATE channels SET user_limit = ? WHERE id = ?').run(userLimit, created.lastInsertRowid);
     broadcastServerUpdate(serverId);
     const server = selectServerById.get(serverId);
     return res.status(201).json({ server: serializeServerEntity(server, req.user.id) });
@@ -3346,7 +3462,12 @@ app.get('/api/servers/:serverId/channels/:channelId/voice', ensureAuthenticated,
     if (!hasPermission(permissions, PERMISSIONS.VIEW_CHANNEL)) {
       return res.status(403).json({ message: 'Missing permission to view this voice channel.' });
     }
-    return res.json({ participants: listVoiceParticipants(channelId) });
+    return res.json({
+      participants: listVoiceParticipants(channelId),
+      canConnect: hasPermission(permissions, PERMISSIONS.VIEW_CHANNEL | PERMISSIONS.CONNECT_VOICE),
+      canSpeak: hasPermission(permissions, PERMISSIONS.SPEAK_VOICE),
+      canStream: hasPermission(permissions, PERMISSIONS.STREAM)
+    });
   } catch (error) {
     return res.status(error.statusCode || 500).json({ message: error.message });
   }
@@ -3366,7 +3487,40 @@ app.post('/api/servers/:serverId/channels/:channelId/voice/join', ensureAuthenti
     if (!hasPermission(permissions, PERMISSIONS.CONNECT_VOICE)) {
       return res.status(403).json({ message: 'Missing permission to connect to this channel.' });
     }
-    upsertVoiceSession.run(serverId, channelId, req.user.id, req.body?.muted ? 1 : 0, req.body?.deafened ? 1 : 0);
+    const currentSession = db.prepare('SELECT channel_id FROM voice_sessions WHERE user_id = ?').get(req.user.id);
+    if (currentSession && currentSession.channel_id !== channelId) {
+      return res.status(409).json({ message: 'Вы уже подключены к другому голосовому каналу. Сначала выйдите из него.' });
+    }
+    const participantCount = db.prepare('SELECT COUNT(*) AS count FROM voice_sessions WHERE channel_id = ?').get(channelId).count;
+    const userLimit = Math.max(1, Number(channel.user_limit) || 8);
+    if (!currentSession && participantCount >= userLimit) {
+      return res.status(409).json({ message: 'В голосовом канале нет свободных мест.' });
+    }
+    const canSpeak = hasPermission(permissions, PERMISSIONS.SPEAK_VOICE);
+    const muted = !canSpeak || Boolean(req.body?.muted);
+    upsertVoiceSession.run(serverId, channelId, req.user.id, muted ? 1 : 0, req.body?.deafened ? 1 : 0);
+    broadcastVoiceState(channelId);
+    return res.json({ participants: listVoiceParticipants(channelId), canSpeak });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ message: error.message });
+  }
+});
+
+app.patch('/api/servers/:serverId/channels/:channelId/voice/state', ensureAuthenticated, (req, res) => {
+  const serverId = Number(req.params.serverId);
+  const channelId = Number(req.params.channelId);
+  if (!Number.isInteger(serverId) || !Number.isInteger(channelId)) return res.status(400).json({ message: 'Некорректный голосовой канал.' });
+  try {
+    const { channel, permissions } = ensureChannelAccess(serverId, channelId, req.user.id);
+    if (channel.type !== 'voice') return res.status(400).json({ message: 'Канал не является голосовым.' });
+    const session = db.prepare('SELECT id FROM voice_sessions WHERE channel_id = ? AND user_id = ?').get(channelId, req.user.id);
+    if (!session) return res.status(409).json({ message: 'Вы не подключены к этому голосовому каналу.' });
+    const requestedMuted = Boolean(req.body?.muted);
+    if (!requestedMuted && !hasPermission(permissions, PERMISSIONS.SPEAK_VOICE)) {
+      return res.status(403).json({ message: 'У вас нет права говорить в этом канале.' });
+    }
+    db.prepare('UPDATE voice_sessions SET muted = ?, deafened = ? WHERE channel_id = ? AND user_id = ?')
+      .run(requestedMuted ? 1 : 0, req.body?.deafened ? 1 : 0, channelId, req.user.id);
     broadcastVoiceState(channelId);
     return res.json({ participants: listVoiceParticipants(channelId) });
   } catch (error) {
@@ -3386,6 +3540,7 @@ app.post('/api/servers/:serverId/channels/:channelId/voice/leave', ensureAuthent
       return res.status(400).json({ message: 'Channel is not voice.' });
     }
     deleteVoiceSession.run(channelId, req.user.id);
+    io.to(getChannelRoom(channelId)).emit('voice:left', { channelId, userId: req.user.id });
     broadcastVoiceState(channelId);
     return res.json({ participants: listVoiceParticipants(channelId) });
   } catch (error) {

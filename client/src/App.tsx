@@ -4,13 +4,15 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   Home, Users, MessageCircle, Settings, Plus, X, ChevronDown, ChevronRight,
   ChevronLeft, ChevronRight as ChevronRightIcon, Pin, Search, Command,
-  Phone, Mic, MicOff, Headphones, HeadphoneOff, LogOut, Moon,
+  Phone, PhoneOff, Mic, MicOff, Headphones, HeadphoneOff, Camera, MonitorUp, Lock, LogOut, Moon,
   Sun, Monitor, MoreHorizontal, CornerDownLeft, UserRoundPlus, FolderPlus, RefreshCw, Keyboard,
   PanelLeftClose, PanelLeftOpen, Check, Volume2, Circle,
 } from 'lucide-react';
 import { LoginPanel } from './components/LoginPanel';
 import { ProfileSetup } from './components/ProfileSetup';
 import { MessengerWorkspace } from './components/MessengerWorkspace';
+import { VoiceRoom } from './components/VoiceRoom';
+import { Field, Input, Select, Textarea, Button } from './components/ui';
 import { FriendsPanel } from './components/FriendsPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { Avatar } from './components/Avatar';
@@ -18,11 +20,11 @@ import { DefaultAvatar } from './components/DefaultAvatar';
 import { apiFetch } from './lib/api';
 import { applyTheme, isThemeChoice, type ThemeChoice } from './lib/theme';
 import { loadingPhrases } from './lib/phrases';
-import { getNexoSoundPreferences, playNexoSound, saveNexoSoundPreferences } from './lib/sounds';
+import { playNexoSound } from './lib/sounds';
 import { getSocket } from './lib/socket';
 import type { ChannelMessage, Conversation, FriendPayload, Message, Server, User, UserStatus } from './types';
 
-type TabKind = 'home' | 'friends' | 'dm' | 'channel' | 'settings';
+type TabKind = 'home' | 'friends' | 'dm' | 'channel' | 'voice' | 'settings';
 type WorkspaceTab = {
   id: string;
   kind: TabKind;
@@ -40,6 +42,7 @@ type PaletteEntry = { id: string; title: string; subtitle?: string; group: strin
 type ContextState = { x: number; y: number; tabId?: string; target?: SidebarPin; server?: Server } | null;
 type StatusChoice = { value: UserStatus; label: string };
 type IncomingCallInfo = { conversationId: number; from: number; user: User; mediaType: 'audio' | 'video'; groupTitle?: string };
+type VoiceInviteInfo = { serverId: number; channelId: number; serverName: string; channelName: string; from: number; user: User };
 type DeepLinkPayload = { type: 'dm'; conversationId: number; messageId?: number } | { type: 'channel'; serverId: number; channelId: number; messageId?: number };
 type ActiveCallInfo = { conversationId: number; title: string; startedAt: number };
 
@@ -133,20 +136,21 @@ export default function App() {
   const [micMuted, setMicMuted] = useState(false);
   const [deafened, setDeafened] = useState(false);
   const [savedMicMuted, setSavedMicMuted] = useState(false);
-  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
-  const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
-  const [audioOutputs, setAudioOutputs] = useState<MediaDeviceInfo[]>([]);
   const [audioInputId, setAudioInputId] = useState('');
   const [audioOutputId, setAudioOutputId] = useState('');
-  const [dockSoundVolume, setDockSoundVolume] = useState(() => getNexoSoundPreferences().volume);
-  const [customStatusOpen, setCustomStatusOpen] = useState(false);
-  const [customStatusDraft, setCustomStatusDraft] = useState('');
+  const [videoInputId, setVideoInputId] = useState('');
   const [notificationUpdate, setNotificationUpdate] = useState<{ version: string; message: string } | null>(null);
   const [pendingIncomingCall, setPendingIncomingCall] = useState<IncomingCallInfo | null>(null);
+  const [pendingVoiceInvite, setPendingVoiceInvite] = useState<VoiceInviteInfo | null>(null);
   const [pendingDeepLink, setPendingDeepLink] = useState<DeepLinkPayload | null>(null);
   const [activeCallInfo, setActiveCallInfo] = useState<ActiveCallInfo | null>(null);
   const [callClock, setCallClock] = useState(Date.now());
-  const [appVersion, setAppVersion] = useState('0.0.7-alpha');
+  const [activeVoiceInfo, setActiveVoiceInfo] = useState<{ serverId: number; channelId: number; serverName: string; channelName: string; joinedAt: number } | null>(null);
+  const [voiceClock, setVoiceClock] = useState(Date.now());
+  const [voiceParticipantsByChannel, setVoiceParticipantsByChannel] = useState<Record<number, Array<{ user: { id: number; username: string; display_name: string; avatar_url: string; avatar_color?: string }; muted: boolean; deafened: boolean; canSpeak?: boolean }>>>({});
+  const [voiceSpeakingByChannel, setVoiceSpeakingByChannel] = useState<Record<number, number[]>>({});
+  const [createChannelUserLimit, setCreateChannelUserLimit] = useState(8);
+  const [appVersion, setAppVersion] = useState('0.0.8-alpha');
 
   const desktopApi = typeof window !== 'undefined' ? window.nexoAPI : undefined;
   const tabStripRef = useRef<HTMLDivElement>(null);
@@ -171,6 +175,39 @@ export default function App() {
   }, [desktopApi]);
 
   useEffect(() => {
+    const onVoiceState = (event: Event) => {
+      const detail = (event as CustomEvent<{ active: boolean; serverId?: number; channelId?: number; serverName?: string; channelName?: string; joinedAt?: number }>).detail;
+      if (detail?.active && detail.serverId && detail.channelId) {
+        document.documentElement.dataset.nexoVoiceActive = 'true';
+        document.documentElement.dataset.nexoVoiceChannelId = String(detail.channelId);
+        setActiveVoiceInfo({ serverId: detail.serverId, channelId: detail.channelId, serverName: detail.serverName || '', channelName: detail.channelName || '', joinedAt: detail.joinedAt || Date.now() });
+      } else if (!detail?.active) {
+        delete document.documentElement.dataset.nexoVoiceActive;
+        delete document.documentElement.dataset.nexoVoiceChannelId;
+        setActiveVoiceInfo((current) => current && (detail?.channelId === undefined || detail.channelId === current.channelId) ? null : current);
+      }
+    };
+    const onVoiceSpeaking = (event: Event) => {
+      const detail = (event as CustomEvent<{ channelId: number; userIds: number[] }>).detail;
+      if (detail?.channelId) setVoiceSpeakingByChannel((current) => ({ ...current, [detail.channelId]: detail.userIds || [] }));
+    };
+    const onVoiceParticipants = (event: Event) => {
+      const detail = (event as CustomEvent<{ channelId: number; participants: Array<{ user: { id: number; username: string; display_name: string; avatar_url: string; avatar_color?: string }; muted: boolean; deafened: boolean; canSpeak?: boolean }> }>).detail;
+      if (detail?.channelId) setVoiceParticipantsByChannel((current) => ({ ...current, [detail.channelId]: detail.participants || [] }));
+    };
+    window.addEventListener('nexo-voice-state', onVoiceState);
+    window.addEventListener('nexo-voice-participants', onVoiceParticipants);
+    window.addEventListener('nexo-voice-speaking', onVoiceSpeaking);
+    return () => { window.removeEventListener('nexo-voice-state', onVoiceState); window.removeEventListener('nexo-voice-participants', onVoiceParticipants); window.removeEventListener('nexo-voice-speaking', onVoiceSpeaking); };
+  }, []);
+
+  useEffect(() => {
+    if (!activeVoiceInfo) return;
+    const timer = window.setInterval(() => setVoiceClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [activeVoiceInfo]);
+
+  useEffect(() => {
     desktopApi?.setNotificationCount?.(unreadTotal);
   }, [desktopApi, unreadTotal]);
 
@@ -178,12 +215,6 @@ export default function App() {
     applyTheme(theme);
     desktopApi?.setWindowTheme?.(theme);
   }, [theme, desktopApi]);
-
-  useEffect(() => {
-    const syncSoundVolume = () => setDockSoundVolume(getNexoSoundPreferences().volume);
-    window.addEventListener('nexo-sound-preferences-updated', syncSoundVolume);
-    return () => window.removeEventListener('nexo-sound-preferences-updated', syncSoundVolume);
-  }, []);
 
   useEffect(() => {
     if (user?.status === 'dnd') document.documentElement.dataset.nexoDnd = 'true';
@@ -229,9 +260,9 @@ export default function App() {
         const validTabs = (saved.tabs || []).filter((tab) => {
           if (tab.kind === 'home' || tab.kind === 'friends' || tab.kind === 'settings') return true;
           if (tab.kind === 'dm') return nextConversations.some((conversation) => conversation.id === tab.targetId);
-          if (tab.kind === 'channel') {
+          if (tab.kind === 'channel' || tab.kind === 'voice') {
             const server = nextServers.find((item) => item.id === tab.serverId);
-            return Boolean(server?.channels.some((channel) => channel.id === tab.channelId));
+            return Boolean(server?.channels.some((channel) => channel.id === tab.channelId && (tab.kind !== 'voice' || channel.type === 'voice')));
           }
           return false;
         });
@@ -349,14 +380,12 @@ export default function App() {
     if (!user) return;
     const savedInput = localStorage.getItem(`nexo.audio-input.${user.id}`) || '';
     const savedOutput = localStorage.getItem(`nexo.audio-output.${user.id}`) || '';
+    const savedVideo = localStorage.getItem(`nexo.video-input.${user.id}`) || '';
     const savedMic = localStorage.getItem(`nexo.mic-muted.${user.id}`) === 'true';
     setAudioInputId(savedInput);
     setAudioOutputId(savedOutput);
+    setVideoInputId(savedVideo);
     setMicMuted(savedMic);
-    void navigator.mediaDevices?.enumerateDevices?.().then((devices) => {
-      setAudioInputs(devices.filter((device) => device.kind === 'audioinput'));
-      setAudioOutputs(devices.filter((device) => device.kind === 'audiooutput'));
-    }).catch(() => {});
   }, [user]);
 
   useEffect(() => {
@@ -434,8 +463,13 @@ export default function App() {
         })?.catch(() => {});
       }
     };
+    const onVoiceInvite = (payload: VoiceInviteInfo) => {
+      if (!payload || payload.user?.id === user.id) return;
+      setPendingVoiceInvite(payload);
+    };
     socket.on('call:ring', onCallInvite);
-    return () => { socket.off('call:ring', onCallInvite); };
+    socket.on('voice:invite', onVoiceInvite);
+    return () => { socket.off('call:ring', onCallInvite); socket.off('voice:invite', onVoiceInvite); };
   }, [user?.id, user?.status, conversations, desktopApi]);
 
   useEffect(() => {
@@ -704,6 +738,25 @@ export default function App() {
     }, background);
   }
 
+  function openVoiceTab(server: Server, channelId: number): boolean {
+    const channel = server.channels.find((item) => item.id === channelId && item.type === 'voice');
+    if (!channel) return false;
+    if (activeCallInfo) {
+      if (!window.confirm('Выйти из личного звонка и подключиться к голосовому каналу?')) return false;
+      window.dispatchEvent(new CustomEvent('nexo-end-call'));
+      window.setTimeout(() => openTab({ id: `voice:${channel.id}`, kind: 'voice', title: `Голосовой · ${channel.name}`, targetId: channel.id, serverId: server.id, channelId: channel.id }), 180);
+      return true;
+    }
+    if (activeVoiceInfo && activeVoiceInfo.channelId !== channelId) {
+      if (!window.confirm('Выйти из текущего голосового канала и подключиться к другому?')) return false;
+      window.dispatchEvent(new CustomEvent('nexo-voice-action', { detail: { channelId: activeVoiceInfo.channelId, action: 'leave' } }));
+      window.setTimeout(() => openTab({ id: `voice:${channel.id}`, kind: 'voice', title: `Голосовой · ${channel.name}`, targetId: channel.id, serverId: server.id, channelId: channel.id }), 140);
+      return true;
+    }
+    openTab({ id: `voice:${channel.id}`, kind: 'voice', title: `Голосовой · ${channel.name}`, targetId: channel.id, serverId: server.id, channelId: channel.id });
+    return true;
+  }
+
   function selectServer(server: Server) {
     setExpandedServers((current) => current.includes(server.id) ? current : [...current, server.id]);
     const firstTextChannel = server.channels.find((channel) => channel.type === 'text');
@@ -820,6 +873,7 @@ export default function App() {
     setCreateChannelName('');
     setCreateChannelTopic('');
     setCreateChannelType('text');
+    setCreateChannelUserLimit(8);
     setCreateChannelStatus('');
   }
 
@@ -833,7 +887,7 @@ export default function App() {
     try {
       const response = await apiFetch(`/api/servers/${createChannelServerId}/channels`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: createChannelName.trim(), topic: createChannelTopic.trim(), type: createChannelType })
+        body: JSON.stringify({ name: createChannelName.trim(), topic: createChannelTopic.trim(), type: createChannelType, userLimit: createChannelUserLimit })
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.message || 'Не удалось создать канал.');
@@ -843,6 +897,7 @@ export default function App() {
       const createdChannel = nextServer.channels.find((channel) => !servers.find((server) => server.id === nextServer.id)?.channels.some((old) => old.id === channel.id));
       setCreateChannelServerId(null);
       if (createdChannel?.type === 'text') openChannelTab(nextServer, createdChannel.id);
+      if (createdChannel?.type === 'voice') openVoiceTab(nextServer, createdChannel.id);
     } catch (error) {
       setCreateChannelStatus((error as Error).message);
     }
@@ -1058,12 +1113,6 @@ export default function App() {
   async function changeStatus(next: UserStatus) {
     wasManuallySetStatusRef.current = next !== 'online';
     await updateStatus(next, user?.custom_status || '');
-    setStatusMenuOpen(false);
-  }
-
-  async function saveCustomStatus() {
-    await updateStatus(user?.status || 'online', customStatusDraft.trim().slice(0, 60));
-    setCustomStatusOpen(false);
   }
 
   function contextTargetClick(event: MouseEvent, target: SidebarPin) {
@@ -1122,8 +1171,7 @@ export default function App() {
         <>
           <div className="nexo-tabbar">
             <button type="button" className="sidebar-toggle-button"
-              aria-label={sidebarCollapsed ? 'Показать боковую панель' : 'Скрыть боковую панель'}
-              title={sidebarCollapsed ? 'Показать боковую панель (Ctrl+B)' : 'Скрыть боковую панель (Ctrl+B)'}
+              aria-label={sidebarCollapsed ? 'Показать боковую панель' : 'Скрыть боковую панель'} data-tooltip={sidebarCollapsed ? 'Показать боковую панель (Ctrl+B)' : 'Скрыть боковую панель (Ctrl+B)'}
               onClick={() => setSidebarCollapsed((value) => !value)}>
               {sidebarCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
             </button>
@@ -1142,17 +1190,17 @@ export default function App() {
                   onDragOverCapture={(event: DragEvent<HTMLButtonElement>) => event.preventDefault()}
                   onDropCapture={(event: DragEvent<HTMLButtonElement>) => { event.preventDefault(); reorderTabs(event.dataTransfer.getData('text/nexo-tab'), tab.id); }}
                   onContextMenu={(event) => { event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY, tabId: tab.id }); }}>
-                  {tab.kind === 'home' ? <Home size={14} /> : tab.kind === 'friends' ? <Users size={14} /> : tab.kind === 'dm' ? <Avatar user={conversations.find((conversation) => conversation.id === tab.targetId)?.counterpart || conversations.find((conversation) => conversation.id === tab.targetId)?.participants.find((participant) => participant.id !== user?.id)} size={19} /> : tab.kind === 'channel' ? <HashIcon /> : <Settings size={14} />}
+                  {tab.kind === 'home' ? <Home size={14} /> : tab.kind === 'friends' ? <Users size={14} /> : tab.kind === 'dm' ? <Avatar user={conversations.find((conversation) => conversation.id === tab.targetId)?.counterpart || conversations.find((conversation) => conversation.id === tab.targetId)?.participants.find((participant) => participant.id !== user?.id)} size={19} /> : tab.kind === 'channel' ? <HashIcon /> : tab.kind === 'voice' ? <Volume2 size={14} /> : <Settings size={14} />}
                   {!tab.pinned && <span className="tab-title">{tab.title}</span>}
                   {tab.unread ? <span className="tab-unread">{tab.unread > 9 ? '9+' : tab.unread}</span> : null}
-                  {tab.pinned ? null : <span className="tab-close" role="button" title="Закрыть вкладку (Ctrl+W)"
+                  {tab.pinned ? null : <span className="tab-close" role="button" data-tooltip="Закрыть вкладку (Ctrl+W)"
                     onClick={(event) => { event.stopPropagation(); closeTab(tab.id); }}><X size={12} /></span>}
                   {activeTabId === tab.id && <motion.i layoutId="active-tab-indicator" className="tab-indicator" />}
                 </motion.button>
               ))}
               </AnimatePresence>
             </div>
-            <button type="button" className="tab-add" aria-label="Новая вкладка" title="Новая вкладка (Ctrl+T)" onClick={() => openPalette()}>
+            <button type="button" className="tab-add" aria-label="Новая вкладка" data-tooltip="Новая вкладка (Ctrl+T)" onClick={() => openPalette()}>
               <Plus size={16} />
             </button>
             <div className="tab-scroll-arrow"><button aria-label="Прокрутить вкладки вправо" onClick={() => tabStripRef.current?.scrollBy({ left: 240, behavior: 'smooth' })}><ChevronRightIcon size={15} /></button></div>
@@ -1179,7 +1227,7 @@ export default function App() {
 
                   <SidebarSection title="Диалоги" count={conversations.length} collapsed={collapsedSections.includes('dms')}
                     onToggle={() => setCollapsedSections((current) => current.includes('dms') ? current.filter((item) => item !== 'dms') : [...current, 'dms'])}
-                    action={<button type="button" aria-label="Новое сообщение" title="Новое сообщение" onClick={() => openPalette('new-message')}><Plus size={14} /></button>}>
+                    action={<button type="button" aria-label="Новое сообщение" data-tooltip="Новое сообщение" onClick={() => openPalette('new-message')}><Plus size={14} /></button>}>
                     {conversations.map((conversation) => {
                       const person = conversation.counterpart || conversation.participants.find((participant) => participant.id !== user.id);
                       const item: SidebarPin = { id: `dm:${conversation.id}`, kind: 'dm', title: person?.display_name || person?.username || 'Диалог', targetId: conversation.id };
@@ -1189,8 +1237,8 @@ export default function App() {
                         onContextMenu={(event) => contextTargetClick(event, item)}>
                         <Avatar user={person} size={27} showStatus />
                         <span className="sidebar-row-text"><strong>{person?.display_name || person?.username || 'Диалог'}</strong><small>Откройте, чтобы продолжить разговор</small></span>
-                        {unreadDmCounts[conversation.id] > 0 && <span className="sidebar-count-badge" title={`${unreadDmCounts[conversation.id]} новых сообщений`}>{unreadDmCounts[conversation.id] > 99 ? '99+' : unreadDmCounts[conversation.id]}</span>}
-                        {unreadDmMentionCounts[conversation.id] > 0 && <span className="sidebar-mention-badge" title={`${unreadDmMentionCounts[conversation.id]} упоминаний`}>@{unreadDmMentionCounts[conversation.id] > 99 ? '99+' : unreadDmMentionCounts[conversation.id]}</span>}
+                        {unreadDmCounts[conversation.id] > 0 && <span className="sidebar-count-badge" data-tooltip={`${unreadDmCounts[conversation.id]} новых сообщений`}>{unreadDmCounts[conversation.id] > 99 ? '99+' : unreadDmCounts[conversation.id]}</span>}
+                        {unreadDmMentionCounts[conversation.id] > 0 && <span className="sidebar-mention-badge" data-tooltip={`${unreadDmMentionCounts[conversation.id]} упоминаний`}>@{unreadDmMentionCounts[conversation.id] > 99 ? '99+' : unreadDmMentionCounts[conversation.id]}</span>}
                       </button>;
                     })}
                     {conversations.length === 0 && <button type="button" className="sidebar-empty-action" onClick={() => openFriendsTab()}>Диалогов пока нет — найдите друга</button>}
@@ -1198,7 +1246,7 @@ export default function App() {
 
                   <SidebarSection title="Пространства" count={servers.length} collapsed={collapsedSections.includes('servers')}
                     onToggle={() => setCollapsedSections((current) => current.includes('servers') ? current.filter((item) => item !== 'servers') : [...current, 'servers'])}
-                    action={<button type="button" aria-label="Создать пространство" title="Создать пространство" onClick={() => setCreateSpaceOpen(true)}><Plus size={14} /></button>}>
+                    action={<button type="button" aria-label="Создать пространство" data-tooltip="Создать пространство" onClick={() => setCreateSpaceOpen(true)}><Plus size={14} /></button>}>
                     {servers.map((server) => (
                       <div className="sidebar-server" key={server.id}>
                         <button type="button" className="sidebar-server-head" onClick={() => setExpandedServers((current) => current.includes(server.id) ? current.filter((id) => id !== server.id) : [...current, server.id])}
@@ -1210,14 +1258,33 @@ export default function App() {
                         </button>
                         {expandedServers.includes(server.id) && server.channels.map((channel) => {
                           const item: SidebarPin = { id: `channel:${channel.id}`, kind: 'channel', title: `# ${channel.name} · ${server.name}`, targetId: channel.id, serverId: server.id, channelId: channel.id };
-                          if (channel.type !== 'text') return <div key={channel.id} className="sidebar-row disabled" title="Скоро"><Volume2 size={14} /><span>{channel.name}</span><small>Скоро</small></div>;
+                          if (channel.type === 'voice') {
+                            const members = voiceParticipantsByChannel[channel.id] || [];
+                            const currentVoiceTab = activeTabId === `voice:${channel.id}`;
+                            const canConnect = channel.canConnect !== false;
+                            return <div key={channel.id} className={`sidebar-voice-channel ${canConnect ? '' : 'locked'}`}>
+                              <button type="button" disabled={!canConnect} className={`sidebar-row voice-channel-row ${currentVoiceTab ? 'active' : ''}`}
+                                onClick={() => openVoiceTab(server, channel.id)} data-tooltip={canConnect ? `Войти в голосовой канал ${channel.name}` : 'Нет права подключаться к этому каналу'}>
+                                {canConnect ? <Volume2 size={14} /> : <Lock size={14} />}
+                                <span className="sidebar-row-text"><strong>{channel.name}</strong></span>
+                                <small>{canConnect ? `${members.length}/${channel.user_limit || 8}` : 'Нет доступа'}</small>
+                              </button>
+                              {members.map((member) => <div key={member.user.id} className={voiceSpeakingByChannel[channel.id]?.includes(member.user.id) ? "sidebar-voice-member speaking" : "sidebar-voice-member"}>
+                                <Avatar user={member.user} size={24} />
+                                <span>{member.user.display_name || member.user.username}</span>
+                                {member.muted && <MicOff size={12} />}
+                                {member.deafened && <HeadphoneOff size={12} />}
+                              </div>)}
+                            </div>;
+                          }
+
                           return <button type="button" key={channel.id} className={`sidebar-row channel-row ${activeTabId === item.id ? 'active' : ''} ${unreadChannelCounts[channel.id] ? 'has-unread' : ''} ${unreadChannelMentionCounts[channel.id] ? 'has-mention' : ''}`}
                             onClick={(event) => openChannelTab(server, channel.id, event.ctrlKey || event.metaKey)}
                             onAuxClick={(event) => { if (event.button === 1) { event.preventDefault(); openChannelTab(server, channel.id, true); } }}
                             onContextMenu={(event) => contextTargetClick(event, item)}>
                             <HashIcon /><span className="sidebar-row-text"><strong>{channel.name}</strong></span>
-                            {unreadChannelCounts[channel.id] > 0 && <span className="sidebar-count-badge" title={`${unreadChannelCounts[channel.id]} новых сообщений`}>{unreadChannelCounts[channel.id] > 99 ? '99+' : unreadChannelCounts[channel.id]}</span>}
-                            {unreadChannelMentionCounts[channel.id] > 0 && <span className="sidebar-mention-badge" title={`${unreadChannelMentionCounts[channel.id]} упоминаний`}>@{unreadChannelMentionCounts[channel.id] > 99 ? '99+' : unreadChannelMentionCounts[channel.id]}</span>}
+                            {unreadChannelCounts[channel.id] > 0 && <span className="sidebar-count-badge" data-tooltip={`${unreadChannelCounts[channel.id]} новых сообщений`}>{unreadChannelCounts[channel.id] > 99 ? '99+' : unreadChannelCounts[channel.id]}</span>}
+                            {unreadChannelMentionCounts[channel.id] > 0 && <span className="sidebar-mention-badge" data-tooltip={`${unreadChannelMentionCounts[channel.id]} упоминаний`}>@{unreadChannelMentionCounts[channel.id] > 99 ? '99+' : unreadChannelMentionCounts[channel.id]}</span>}
                           </button>;
                         })}
                       </div>
@@ -1226,34 +1293,52 @@ export default function App() {
                   </SidebarSection>
                   </div>
                   <div className="sidebar-user-area">
+                    {activeVoiceInfo && <div className="active-voice-panel">
+                      <div className="active-voice-heading">
+                        <button type="button" className="active-voice-return" onClick={() => setActiveTabId(`voice:${activeVoiceInfo.channelId}`)}>
+                          <span className="active-voice-dot" />
+                          <span><strong>Голосовая связь</strong><small>{activeVoiceInfo.channelName} · {activeVoiceInfo.serverName} · {formatCallDuration(voiceClock - activeVoiceInfo.joinedAt)}</small></span>
+                        </button>
+                        <button type="button" className="hangup" aria-label="Выйти из голосового канала" data-tooltip="Выйти из голосового канала" onClick={() => window.dispatchEvent(new CustomEvent('nexo-voice-action', { detail: { channelId: activeVoiceInfo.channelId, action: 'leave' } }))}><PhoneOff size={15} /></button>
+                      </div>
+                      <div className="active-voice-actions">
+                        <button type="button" className={micMuted ? 'is-off' : ''} data-tooltip={micMuted ? 'Включить микрофон' : 'Выключить микрофон'} onClick={() => { if (deafened) setSavedMicMuted(!savedMicMuted); else setMic(!micMuted); }}>{micMuted ? <MicOff size={15} /> : <Mic size={15} />}</button>
+                        <button type="button" className={deafened ? 'is-off' : ''} data-tooltip={deafened ? 'Включить звук' : 'Выключить звук'} onClick={() => { if (!deafened) { setSavedMicMuted(micMuted); setMic(true); setDeafened(true); } else { setDeafened(false); setMic(savedMicMuted); } }}>{deafened ? <HeadphoneOff size={15} /> : <Headphones size={15} />}</button>
+                        <button type="button" data-tooltip="Камера" onClick={() => window.dispatchEvent(new CustomEvent('nexo-voice-action', { detail: { channelId: activeVoiceInfo.channelId, action: 'camera' } }))}><Camera size={15} /></button>
+                        <button type="button" data-tooltip="Демонстрация экрана" onClick={() => window.dispatchEvent(new CustomEvent('nexo-voice-action', { detail: { channelId: activeVoiceInfo.channelId, action: 'screen' } }))}><MonitorUp size={15} /></button>
+                      </div>
+                    </div>}
                     {activeCallInfo && <div className="active-call-strip">
-                      <div><span className="status-dot" /><strong>Звонок · {activeCallInfo.title}</strong><small>{formatCallDuration(callClock - activeCallInfo.startedAt)}</small></div>
-                      <button type="button" title="Вернуться к звонку" aria-label="Вернуться к звонку" onClick={() => setActiveTabId(`dm:${activeCallInfo.conversationId}`)}><Phone size={14} /></button>
-                      <button type="button" className="hangup" title="Завершить звонок" aria-label="Завершить звонок" onClick={() => window.dispatchEvent(new CustomEvent('nexo-end-call'))}><X size={14} /></button>
+                      <button type="button" className="active-call-return" onClick={() => setActiveTabId(`dm:${activeCallInfo.conversationId}`)} aria-label="Вернуться к звонку">
+                        <span className="status-dot" />
+                        <span className="active-call-copy">
+                          <strong>Звонок · {activeTab.kind === 'dm' && activeTab.targetId === activeCallInfo.conversationId ? activeTab.title : activeCallInfo.title}</strong>
+                          <small>{formatCallDuration(callClock - activeCallInfo.startedAt)} · Личный диалог</small>
+                        </span>
+                      </button>
+                      <button type="button" className="hangup" data-tooltip="Завершить звонок" aria-label="Завершить звонок" onClick={() => window.dispatchEvent(new CustomEvent('nexo-end-call'))}><PhoneOff size={15} /></button>
                     </div>}
                     
                     <div className="nexo-user-dock">
-                      <button type="button" className="dock-user"
-                        onClick={() => setStatusMenuOpen((value) => !value)}
-                        aria-haspopup="menu" aria-expanded={statusMenuOpen} title="Профиль и настройки">
+                      <div className="dock-user" aria-label={`${user.display_name || user.username}, @${user.username}`}>
                         <Avatar user={user} size={36} showStatus />
                         <span className="dock-user-copy"><strong>{user.display_name || user.username}</strong><small>{user.custom_status || `@${user.username}`}</small></span>
-                      </button>
+                      </div>
                       <div className="dock-actions">
                         <button type="button" className={micMuted ? 'dock-icon danger' : 'dock-icon'}
                           aria-label={micMuted ? 'Включить микрофон' : 'Выключить микрофон'}
-                          title={micMuted ? 'Включить микрофон' : 'Выключить микрофон'} onClick={() => setMic(!micMuted)}>
+                          data-tooltip={micMuted ? 'Включить микрофон' : 'Выключить микрофон'} onClick={() => setMic(!micMuted)}>
                           {micMuted ? <MicOff size={17} /> : <Mic size={17} />}
                         </button>
                         <button type="button" className={deafened ? 'dock-icon danger' : 'dock-icon'}
                           aria-label={deafened ? 'Включить звук' : 'Отключить звук'}
-                          title={deafened ? 'Включить звук' : 'Отключить звук'} onClick={() => {
+                          data-tooltip={deafened ? 'Включить звук' : 'Отключить звук'} onClick={() => {
                             if (!deafened) { playNexoSound('headphones-off'); setSavedMicMuted(micMuted); setMic(true); setDeafened(true); }
                             else { playNexoSound('headphones-on'); setDeafened(false); setMic(savedMicMuted); }
                           }}>
                           {deafened ? <HeadphoneOff size={17} /> : <Headphones size={17} />}
                         </button>
-                        <button type="button" className="dock-icon" aria-label="Настройки" title="Настройки"
+                        <button type="button" className="dock-icon" aria-label="Настройки" data-tooltip="Настройки"
                           onClick={() => openSettingsTab('account')}><Settings size={17} /></button>
                       </div>
                     </div>                  </div>
@@ -1274,7 +1359,19 @@ export default function App() {
                     showConversationList={false} openConversationId={tab.targetId || null} openMessageId={tab.messageId || null}
                     pendingIncomingCall={pendingIncomingCall?.conversationId === tab.targetId ? pendingIncomingCall : null}
                     onIncomingCallHandled={() => setPendingIncomingCall(null)}
-                    micMuted={micMuted} onToggleMic={() => setMic(!micMuted)} deafened={deafened} audioInputId={audioInputId} audioOutputId={audioOutputId} />}
+                    micMuted={micMuted} onToggleMic={() => setMic(!micMuted)} deafened={deafened} audioInputId={audioInputId} audioOutputId={audioOutputId} videoInputId={videoInputId} />}
+                  {tab.kind === 'voice' && (() => {
+                    const server = servers.find((item) => item.id === tab.serverId);
+                    const channel = server?.channels.find((item) => item.id === tab.channelId && item.type === 'voice');
+                    return server && channel ? <VoiceRoom key={tab.id} server={server} channel={channel} user={user}
+                      micMuted={micMuted} deafened={deafened} audioInputId={audioInputId} audioOutputId={audioOutputId} videoInputId={videoInputId}
+                      onToggleMic={() => setMic(!micMuted)}
+                      onToggleDeafen={() => {
+                        if (!deafened) { setSavedMicMuted(micMuted); setMic(true); setDeafened(true); }
+                        else { setDeafened(false); setMic(savedMicMuted); }
+                      }}
+                      onLeave={() => closeTab(tab.id)} /> : <div className="empty-state"><p>Голосовой канал больше недоступен.</p></div>;
+                  })()}
                   {tab.kind === 'channel' && <MessengerWorkspace key={tab.id} user={user} initialMode="servers" embedded isActive={tab.id === activeTabId}
                     showChannelSidebar={false} openServerId={tab.serverId || null} openChannelId={tab.channelId || null} openMessageId={tab.messageId || null}
                     onEditChannel={() => {
@@ -1284,10 +1381,11 @@ export default function App() {
                         title: tab.title, targetId: tab.channelId, serverId: server.id, channelId: tab.channelId
                       });
                     }}
-                    micMuted={micMuted} onToggleMic={() => setMic(!micMuted)} deafened={deafened} audioInputId={audioInputId} audioOutputId={audioOutputId} />}
+                    micMuted={micMuted} onToggleMic={() => setMic(!micMuted)} deafened={deafened} audioInputId={audioInputId} audioOutputId={audioOutputId} videoInputId={videoInputId} />}
                   {tab.kind === 'settings' && <SettingsPanel key={tab.id} user={user} onUserUpdate={(nextUser) => setUser(nextUser)}
                     initialSection={tab.initialSection || 'account'} appVersion={appVersion} onCheckUpdates={handleCheckUpdates}
-                    audioInputId={audioInputId} audioOutputId={audioOutputId}
+                    audioInputId={audioInputId} audioOutputId={audioOutputId} videoInputId={videoInputId}
+                    onVideoInputChange={(id) => { setVideoInputId(id); localStorage.setItem(`nexo.video-input.${user.id}`, id); }}
                     onAudioInputChange={(id) => { setAudioInputId(id); localStorage.setItem(`nexo.audio-input.${user.id}`, id); }}
                     onAudioOutputChange={(id) => { setAudioOutputId(id); localStorage.setItem(`nexo.audio-output.${user.id}`, id); }}
                     onClose={() => closeTab(tab.id)} onLogout={handleLogout} />}
@@ -1323,8 +1421,8 @@ export default function App() {
       {createSpaceOpen && <div className="modal-backdrop"><motion.form className="modal-panel" onSubmit={(event) => { event.preventDefault(); void createSpace(); }}
         initial={{ opacity: 0, scale: .98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .98 }}>
         <header><h2>Новое пространство</h2><button type="button" className="ghost-icon" onClick={() => setCreateSpaceOpen(false)} aria-label="Закрыть"><X size={17} /></button></header>
-        <label><span>Название</span><input value={createSpaceName} onChange={(event) => setCreateSpaceName(event.target.value)} minLength={3} maxLength={48} required /></label>
-        <label><span>Описание</span><textarea value={createSpaceDescription} onChange={(event) => setCreateSpaceDescription(event.target.value)} maxLength={240} rows={3} /></label>
+        <Field label="Название"><Input value={createSpaceName} onChange={(event) => setCreateSpaceName(event.target.value)} minLength={3} maxLength={48} required /></Field>
+        <Field label="Описание"><Textarea value={createSpaceDescription} onChange={(event) => setCreateSpaceDescription(event.target.value)} maxLength={240} rows={3} /></Field>
         {createSpaceStatus && <p className="status error">{createSpaceStatus}</p>}
         <button className="primary" type="submit">Создать пространство</button>
       </motion.form></div>}
@@ -1332,17 +1430,18 @@ export default function App() {
       {createChannelServerId !== null && <div className="modal-backdrop"><motion.form className="modal-panel" onSubmit={(event) => { event.preventDefault(); void createChannel(); }}
         initial={{ opacity: 0, scale: .98 }} animate={{ opacity: 1, scale: 1 }}>
         <header><h2>Создать канал</h2><button type="button" className="ghost-icon" aria-label="Закрыть" onClick={() => setCreateChannelServerId(null)}><X size={16} /></button></header>
-        <label><span>Название</span><input value={createChannelName} onChange={(event) => setCreateChannelName(event.target.value)} minLength={3} maxLength={32} required /></label>
-        <label><span>Тип</span><select value={createChannelType} onChange={(event) => setCreateChannelType(event.target.value as 'text' | 'voice')}><option value="text">Текстовый</option><option value="voice">Голосовой (пока недоступен)</option></select></label>
-        <label><span>Тема</span><textarea value={createChannelTopic} onChange={(event) => setCreateChannelTopic(event.target.value)} maxLength={240} rows={3} /></label>
+        <Field label="Название"><Input value={createChannelName} onChange={(event) => setCreateChannelName(event.target.value)} minLength={3} maxLength={32} required /></Field>
+        <Field label="Тип"><Select value={createChannelType} onChange={(event) => setCreateChannelType(event.target.value as 'text' | 'voice')}><option value="text">Текстовый</option><option value="voice">Голосовой</option></Select></Field>
+        {createChannelType === 'voice' && <Field label="Лимит участников"><Select value={createChannelUserLimit} onChange={(event) => setCreateChannelUserLimit(Number(event.target.value))}>{[2,3,4,5,6,7,8].map((limit) => <option key={limit} value={limit}>{limit} участников</option>)}</Select></Field>}
+        <Field label="Тема"><Textarea value={createChannelTopic} onChange={(event) => setCreateChannelTopic(event.target.value)} maxLength={240} rows={3} /></Field>
         {createChannelStatus && <p className="status error">{createChannelStatus}</p>}
         <button type="submit" className="primary" disabled={createChannelStatus === 'Создаём канал…'}>Создать канал</button>
       </motion.form></div>}
       {channelEditTarget && <div className="modal-backdrop"><motion.form className="modal-panel" onSubmit={(event) => { event.preventDefault(); void saveChannelSettings(); }}
         initial={{ opacity: 0, scale: .98 }} animate={{ opacity: 1, scale: 1 }}>
         <header><h2>Настройки канала</h2><button type="button" className="ghost-icon" aria-label="Закрыть" onClick={() => setChannelEditTarget(null)}><X size={16} /></button></header>
-        <label><span>Название</span><input value={channelEditName} onChange={(event) => setChannelEditName(event.target.value)} minLength={3} maxLength={32} required /></label>
-        <label><span>Тема</span><textarea value={channelEditTopic} onChange={(event) => setChannelEditTopic(event.target.value)} maxLength={256} rows={3} /></label>
+        <Field label="Название"><Input value={channelEditName} onChange={(event) => setChannelEditName(event.target.value)} minLength={3} maxLength={32} required /></Field>
+        <Field label="Тема"><Textarea value={channelEditTopic} onChange={(event) => setChannelEditTopic(event.target.value)} maxLength={256} rows={3} /></Field>
         {channelEditStatus && <p className="status error">{channelEditStatus}</p>}
         <div className="channel-settings-actions">
           <button type="submit" className="primary" disabled={channelEditStatus === 'Сохраняем…' || channelEditStatus === 'Удаляем канал…'}>Сохранить</button>
@@ -1354,57 +1453,29 @@ export default function App() {
               </div>}
         </div>
       </motion.form></div>}
-      {statusMenuOpen && user && <ContextMenu x={12} y={Math.max(12, window.innerHeight - 580)} onClose={() => setStatusMenuOpen(false)}>
-        <div className="dock-account-menu" role="menu">
-          <div className="dock-menu-profile">
-            <Avatar user={user} size={38} showStatus />
-            <span><strong>{user.display_name || user.username}</strong><small>@{user.username} · #{user.discriminator || '0001'}</small></span>
+      {pendingVoiceInvite && <div className="modal-backdrop">
+        <motion.section className="modal-panel voice-incoming-invite" role="dialog" aria-modal="true" aria-label="Приглашение в голосовой канал"
+          initial={{ opacity: 0, scale: .98 }} animate={{ opacity: 1, scale: 1 }}>
+          <header><h2>Приглашение в голосовой канал</h2><button type="button" className="ghost-icon" aria-label="Закрыть" onClick={() => {
+            getSocket().emit('voice:invite-response', { to: pendingVoiceInvite.from, channelId: pendingVoiceInvite.channelId, accepted: false });
+            setPendingVoiceInvite(null);
+          }}><X size={16} /></button></header>
+          <div className="voice-invite-from"><Avatar user={pendingVoiceInvite.user} size={44} /><span><strong>{pendingVoiceInvite.user.display_name || pendingVoiceInvite.user.username}</strong><small>{pendingVoiceInvite.serverName} · {pendingVoiceInvite.channelName}</small></span></div>
+          <div className="voice-invite-actions">
+            <button type="button" className="ghost danger" onClick={() => {
+              getSocket().emit('voice:invite-response', { to: pendingVoiceInvite.from, channelId: pendingVoiceInvite.channelId, accepted: false });
+              setPendingVoiceInvite(null);
+            }}>Отклонить</button>
+            <button type="button" className="primary" onClick={() => {
+              const server = servers.find((item) => item.id === pendingVoiceInvite.serverId);
+              const accepted = server ? openVoiceTab(server, pendingVoiceInvite.channelId) : false;
+              if (!accepted) return;
+              getSocket().emit('voice:invite-response', { to: pendingVoiceInvite.from, channelId: pendingVoiceInvite.channelId, accepted: true });
+              setPendingVoiceInvite(null);
+            }}>Принять</button>
           </div>
-          <div className="dock-menu-divider" />
-          <p className="dock-menu-label">Статус</p>
-          {statusChoices.map((choice) => <MenuAction key={choice.value} label={choice.label}
-            icon={<span className="dock-status-icon"><span className={`status-swatch ${choice.value}`} />{user.status === choice.value && <Check size={12} />}</span>}
-            onClick={() => void changeStatus(choice.value)} />)}
-          <MenuAction icon={<MoreHorizontal size={14} />} label="Свой статус…" onClick={() => { setStatusMenuOpen(false); setCustomStatusDraft(user?.custom_status || ''); setCustomStatusOpen(true); }} />
-          <div className="dock-menu-divider" />
-          <p className="dock-menu-label">Устройства</p>
-          <label className="dock-menu-select"><span>Микрофон</span>
-            <select value={audioInputId} onChange={(event) => { setAudioInputId(event.target.value); localStorage.setItem(`nexo.audio-input.${user.id}`, event.target.value); }}>
-              <option value="">Устройство по умолчанию</option>
-              {audioInputs.map((device, index) => <option key={device.deviceId || index} value={device.deviceId}>{device.label || `Микрофон ${index + 1}`}</option>)}
-            </select>
-          </label>
-          <label className="dock-menu-select"><span>Наушники</span>
-            <select value={audioOutputId} onChange={(event) => { setAudioOutputId(event.target.value); localStorage.setItem(`nexo.audio-output.${user.id}`, event.target.value); }}>
-              <option value="">Устройство по умолчанию</option>
-              {audioOutputs.map((device, index) => <option key={device.deviceId || index} value={device.deviceId}>{device.label || `Устройство вывода ${index + 1}`}</option>)}
-            </select>
-          </label>
-          {!audioInputs.length && <p className="dock-menu-hint">Микрофоны появятся после разрешения доступа к аудио.</p>}
-          {!audioOutputs.length && <p className="dock-menu-hint">Устройства вывода не обнаружены.</p>}
-          <label className="dock-menu-select"><span>Громкость звуков · {Math.round(dockSoundVolume * 100)}%</span>
-            <input type="range" min="0" max="1" step="0.02" value={dockSoundVolume}
-              onChange={(event) => {
-                const volume = Number(event.target.value);
-                setDockSoundVolume(volume);
-                saveNexoSoundPreferences({ ...getNexoSoundPreferences(), volume });
-              }} />
-          </label>
-          <div className="dock-menu-divider" />
-          <MenuAction icon={<UserRoundPlus size={14} />} label="Профиль" onClick={() => { setStatusMenuOpen(false); openSettingsTab('profile'); }} />
-          <MenuAction icon={<Settings size={14} />} label="Настройки" onClick={() => { setStatusMenuOpen(false); openSettingsTab('account'); }} />
-          <MenuAction icon={<Keyboard size={14} />} label="Горячие клавиши" onClick={() => { setStatusMenuOpen(false); openSettingsTab('hotkeys'); }} />
-          <MenuAction icon={<RefreshCw size={14} />} label="Обновления" onClick={() => { setStatusMenuOpen(false); openSettingsTab('updates'); }} />
-          <div className="dock-menu-divider" />
-          <MenuAction icon={<LogOut size={14} />} label="Выйти из аккаунта" onClick={() => { setStatusMenuOpen(false); void handleLogout(); }} />
-        </div>
-      </ContextMenu>}
-      {customStatusOpen && <div className="modal-backdrop"><motion.form className="modal-panel" onSubmit={(event) => { event.preventDefault(); void saveCustomStatus(); }}
-        initial={{ opacity: 0, scale: .98 }} animate={{ opacity: 1, scale: 1 }}>
-        <h2>Свой статус</h2><input value={customStatusDraft} onChange={(event) => setCustomStatusDraft(event.target.value)} maxLength={60} placeholder="Над чем работаете?" />
-        <button className="primary" type="submit">Сохранить</button>
-      </motion.form></div>}
-
+        </motion.section>
+      </div>}
       {notificationUpdate && <div className="update-toast"><span>{notificationUpdate.message}</span>
         <button className="primary tiny" onClick={() => openSettingsTab('updates')}>Обновить</button>
         <button className="ghost-icon" aria-label="Позже" onClick={() => setNotificationUpdate(null)}><X size={14} /></button>
@@ -1452,46 +1523,43 @@ function HomeView({ user, conversations, servers, unreadDmCounts, unreadChannelC
     .filter((channel) => channel.type === 'text')
     .slice(0, 3)
     .map((channel) => ({ server, channel }))).slice(0, 6);
-  const [lastItems, setLastItems] = useState<Record<string, { content: string; created_at: string }>>({});
+  const [lastItems, setLastItems] = useState<Record<string, { content: string; created_at: string; authorId?: number }>>({});
 
   useEffect(() => {
     let cancelled = false;
-    async function loadPreviews() {
-      const entries = await Promise.all([
-        ...recent.map(async (conversation) => {
-          try {
-            const response = await apiFetch(`/api/conversations/${conversation.id}/messages`);
-            if (!response.ok) return null;
-            const payload = await response.json();
-            const message = (payload.messages || []).slice(-1)[0];
-            return message ? [`dm:${conversation.id}`, { content: message.content || (message.attachment ? 'Вложение' : 'Сообщение'), created_at: message.created_at }] as const : null;
-          } catch { return null; }
-        }),
-        ...channels.map(async ({ server, channel }) => {
-          try {
-            const response = await apiFetch(`/api/servers/${server.id}/channels/${channel.id}/messages`);
-            if (!response.ok) return null;
-            const payload = await response.json();
-            const message = (payload.messages || []).slice(-1)[0];
-            return message ? [`channel:${channel.id}`, { content: message.content || (message.attachment ? 'Вложение' : 'Сообщение'), created_at: message.created_at }] as const : null;
-          } catch { return null; }
-        })
-      ]);
+    async function loadChannelPreviews() {
+      const entries = await Promise.all(channels.map(async ({ server, channel }) => {
+        try {
+          const response = await apiFetch(`/api/servers/${server.id}/channels/${channel.id}/messages?limit=1`);
+          if (!response.ok) return null;
+          const payload = await response.json();
+          const message = (payload.messages || []).slice(-1)[0];
+          if (!message) return null;
+          const content = message.content?.trim() || (message.attachment?.mime?.startsWith('image/') ? 'Фото' : message.attachment ? `Файл: ${message.attachment.name}` : 'Сообщение');
+          return [`channel:${channel.id}`, { content, created_at: message.created_at, authorId: message.author?.id }] as const;
+        } catch { return null; }
+      }));
       if (!cancelled) {
-        const next: Record<string, { content: string; created_at: string }> = {};
+        const next: Record<string, { content: string; created_at: string; authorId?: number }> = {};
         for (const entry of entries) if (entry) next[entry[0]] = entry[1];
         setLastItems(next);
       }
     }
-    void loadPreviews();
+    void loadChannelPreviews();
     return () => { cancelled = true; };
-  }, [conversations, servers]);
+  }, [servers]);
 
   const formatTime = (value?: string) => {
     if (!value) return '';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
     return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(date);
+  };
+  const dmPreview = (conversation: Conversation) => {
+    const message = conversation.last_message;
+    if (!message) return 'Личный диалог';
+    const content = message.content?.trim() || (message.attachment?.mime?.startsWith('image/') ? 'Фото' : message.attachment ? `Файл: ${message.attachment.name}` : 'Сообщение');
+    return message.author.id === user.id ? `Вы: ${content}` : content;
   };
   const hasItems = recent.length > 0 || channels.length > 0;
   return <div className="nexo-home-view">
@@ -1506,12 +1574,12 @@ function HomeView({ user, conversations, servers, unreadDmCounts, unreadChannelC
         {recent.map((conversation) => {
           const person = conversation.counterpart || conversation.participants.find((participant) => participant.id !== user.id);
           const name = person?.display_name || person?.username || conversation.title || 'Диалог';
-          const preview = lastItems[`dm:${conversation.id}`];
+          const message = conversation.last_message;
           const unread = unreadDmCounts[conversation.id] || 0;
           return <button key={`dm-${conversation.id}`} type="button" onClick={() => openDm(conversation)}>
             <Avatar user={person} size={36} showStatus />
-            <span><strong>{name}</strong><small>{preview?.content || 'Личный диалог'}</small></span>
-            {preview && <time>{formatTime(preview.created_at)}</time>}
+            <span><strong>{name}</strong><small>{dmPreview(conversation)}</small></span>
+            {message && <time>{formatTime(message.created_at)}</time>}
             {unread > 0 && <span className="home-unread">{unread > 99 ? '99+' : unread}</span>}
             <ChevronRight size={15} />
           </button>;
@@ -1521,7 +1589,7 @@ function HomeView({ user, conversations, servers, unreadDmCounts, unreadChannelC
           const unread = unreadChannelCounts[channel.id] || 0;
           return <button key={`channel-${channel.id}`} type="button" onClick={() => openChannel(server, channel.id)}>
             <span className="home-channel-avatar"><HashIcon /></span>
-            <span><strong>{channel.name}</strong><small>{preview?.content || server.name}</small></span>
+            <span><strong>{channel.name}</strong><small>{preview ? `${preview.authorId === user.id ? 'Вы: ' : ''}${preview.content}` : server.name}</small></span>
             {preview && <time>{formatTime(preview.created_at)}</time>}
             {unread > 0 && <span className="home-unread">{unread > 99 ? '99+' : unread}</span>}
             <ChevronRight size={15} />
@@ -1544,7 +1612,7 @@ function CommandPalette({ entries, query, activeIndex, setQuery, onKeyDown, onCl
   let index = -1;
   return <div className="command-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <motion.div className="command-palette" initial={{ opacity: 0, y: 12, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: .99 }}>
-      <div className="command-search"><Search size={18} /><input className="command-palette-input" value={query} onChange={(event) => setQuery(event.target.value)}
+      <div className="command-search"><Search size={18} /><Input className="command-palette-input" value={query} onChange={(event) => setQuery(event.target.value)}
         onKeyDown={onKeyDown} placeholder="Куда перейти или что выполнить?" /><kbd>ESC</kbd></div>
       <div className="command-results">
         {['Диалоги', 'Друзья', 'Каналы', 'Действия'].map((group) => {

@@ -17,6 +17,9 @@ import {
   Camera,
   CameraOff,
   ChevronUp,
+  Maximize2,
+  Minimize2,
+  MoreHorizontal,
   Mic,
   MicOff,
   Plus,
@@ -43,6 +46,7 @@ import type {
 } from '../types';
 import { apiFetch } from '../lib/api';
 import { Avatar } from './Avatar';
+import { Input, Textarea, Slider, Switch, Select } from './ui';
 import { getSocket } from '../lib/socket';
 
 type WorkspaceMode = 'servers' | 'friends';
@@ -62,6 +66,7 @@ type MessengerWorkspaceProps = {
   deafened?: boolean;
   audioInputId?: string;
   audioOutputId?: string;
+  videoInputId?: string;
   pendingIncomingCall?: IncomingCall | null;
   onIncomingCallHandled?: () => void;
   onOpenSettings?: () => void;
@@ -117,6 +122,7 @@ export function MessengerWorkspace({
   deafened = false,
   audioInputId = '',
   audioOutputId = '',
+  videoInputId = '',
   pendingIncomingCall = null,
   onIncomingCallHandled,
   onOpenSettings,
@@ -193,13 +199,14 @@ export function MessengerWorkspace({
       callWasActiveRef.current = true;
       window.dispatchEvent(new CustomEvent('nexo-call-state', { detail: {
         active: true, conversationId: callState.conversationId,
-        title: 'Личный звонок', startedAt: callState.startedAt
+        title: conversations.find((conversation) => conversation.id === callState.conversationId)?.counterpart?.display_name || conversations.find((conversation) => conversation.id === callState.conversationId)?.counterpart?.username || 'Личный звонок',
+        startedAt: callState.startedAt
       } }));
     } else if (callWasActiveRef.current) {
       callWasActiveRef.current = false;
       window.dispatchEvent(new CustomEvent('nexo-call-state', { detail: { active: false } }));
     }
-  }, [callState]);
+  }, [callState, conversations]);
 
   useEffect(() => {
     if (!pendingIncomingCall || pendingIncomingCall.conversationId !== openConversationId) return;
@@ -1020,10 +1027,17 @@ export function MessengerWorkspace({
 
   async function startCall(conversationId: number, options?: { initiator?: boolean; initialSignal?: SignalData }, mediaType: 'audio' | 'video' = 'audio'): Promise<boolean> {
     if (!socketRef.current) return false;
+    if (document.documentElement.dataset.nexoVoiceActive === 'true') {
+      if (!window.confirm('Выйти из голосового канала и начать личный звонок?')) return false;
+      const channelId = Number(document.documentElement.dataset.nexoVoiceChannelId);
+      if (Number.isInteger(channelId)) window.dispatchEvent(new CustomEvent('nexo-voice-action', { detail: { channelId, action: 'leave' } }));
+      await new Promise((resolve) => window.setTimeout(resolve, 180));
+    }
     setCallError('');
     try {
       const audioConstraint: MediaTrackConstraints | boolean = audioInputId ? { deviceId: { exact: audioInputId } } : true;
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint, video: mediaType === 'video' });
+      const videoConstraint: MediaTrackConstraints | boolean = mediaType === 'video' ? (videoInputId ? { deviceId: { exact: videoInputId } } : true) : false;
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint, video: videoConstraint });
       mediaStream.getAudioTracks().forEach((track) => { track.enabled = !micMuted; });
       const peer = new SimplePeer({
         initiator: options?.initiator ?? true,
@@ -1251,7 +1265,7 @@ export function MessengerWorkspace({
               {messageSearchOpen && <div className="message-search-panel">
                 <div className="message-search-input-wrap">
                   <Search size={15} />
-                  <input autoFocus value={messageSearchQuery} onChange={(event) => setMessageSearchQuery(event.target.value)}
+                  <Input autoFocus value={messageSearchQuery} onChange={(event) => setMessageSearchQuery(event.target.value)}
                     placeholder="Поиск по сообщениям и авторам…" aria-label="Поиск по сообщениям" />
                   <button type="button" className="ghost-icon" onClick={() => setMessageSearchOpen(false)} aria-label="Закрыть поиск"><X size={15} /></button>
                 </div>
@@ -1277,11 +1291,11 @@ export function MessengerWorkspace({
                     return (
                       <Fragment key={message.id}>
                         {dayChanged && <div className="message-day-divider"><span>{getMessageDayLabel(message.created_at)}</span></div>}
-                        <article id={`nexo-message-${message.id}`} className={`message-row ${grouped ? 'grouped' : ''} ${animatedMessageIds.includes(`dm:${message.id}`) ? 'message-arrived' : ''}`} title={new Date(message.created_at).toLocaleString('ru-RU')}
+                        <article id={`nexo-message-${message.id}`} className={`message-row ${grouped ? 'grouped' : ''} ${animatedMessageIds.includes(`dm:${message.id}`) ? 'message-arrived' : ''}`}
                           onContextMenu={(event) => openMessageMenu(event, message, 'dm')}>
                           {grouped ? <span className="message-avatar-spacer" /> : <Avatar user={message.author} size={34} />}
                           <div className="message-body">
-                            {!grouped && <header><strong>{authorName}</strong><time title={new Date(message.created_at).toLocaleString('ru-RU')}>{new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></header>}
+                            {!grouped && <header><strong>{authorName}</strong><time className="message-time" data-tooltip={new Date(message.created_at).toLocaleString('ru-RU')}>{new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></header>}
                             {message.reply_to && <MessageReplyPreview replyTo={message.reply_to} onClick={() => document.getElementById(`nexo-message-${message.reply_to!.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })} />}
                             {message.content && <MessageContent content={message.content} />}
                             {message.edited_at && <small className="message-edited-label">изменено</small>}
@@ -1315,7 +1329,7 @@ export function MessengerWorkspace({
                 )}
                 <label className="file-pill">
                   <Paperclip size={16} />
-                  <input
+                  <Input
                     type="file"
                     hidden
                     onChange={(event) => {
@@ -1324,8 +1338,8 @@ export function MessengerWorkspace({
                     }}
                   />
                 </label>
-                <button type="button" className="composer-code-button" title="Вставить блок кода" aria-label="Вставить блок кода" onClick={() => insertCodeBlock(false)}><Code size={16} /></button>
-                <textarea
+                <button type="button" className="composer-code-button" data-tooltip="Вставить блок кода" aria-label="Вставить блок кода" onClick={() => insertCodeBlock(false)}><Code size={16} /></button>
+                <Textarea
                   ref={composerRef}
                   placeholder="Напишите сообщение..."
                   value={composerText}
@@ -1399,7 +1413,7 @@ export function MessengerWorkspace({
                   <button type="button" className={showMembersPanel ? 'ghost active' : 'ghost'} onClick={() => setShowMembersPanel((value) => !value)} title="Показать участников" aria-label="Показать участников">
                     <Users size={16} />Участники
                   </button>
-                  {onEditChannel && <button type="button" className="ghost" onClick={onEditChannel} title="Настройки канала" aria-label="Настройки канала"><Settings size={16} />Канал</button>}
+                  {onEditChannel && <button type="button" className="ghost" onClick={onEditChannel} data-tooltip="Настройки канала" aria-label="Настройки канала"><Settings size={16} />Канал</button>}
                 </div>
               </header>
               {pinnedPanelOpen && <div className="pinned-messages-panel">
@@ -1420,11 +1434,11 @@ export function MessengerWorkspace({
                     return (
                       <Fragment key={message.id}>
                         {dayChanged && <div className="message-day-divider"><span>{getMessageDayLabel(message.created_at)}</span></div>}
-                        <article id={`nexo-channel-message-${message.id}`} className={`message-row ${grouped ? 'grouped' : ''} ${animatedMessageIds.includes(`channel:${message.id}`) ? 'message-arrived' : ''}`} title={new Date(message.created_at).toLocaleString('ru-RU')}
+                        <article id={`nexo-channel-message-${message.id}`} className={`message-row ${grouped ? 'grouped' : ''} ${animatedMessageIds.includes(`channel:${message.id}`) ? 'message-arrived' : ''}`}
                           onContextMenu={(event) => openMessageMenu(event, message, 'channel')}>
                           {grouped ? <span className="message-avatar-spacer" /> : <Avatar user={message.author} size={34} />}
                           <div className="message-body">
-                            {!grouped && <header><strong>{authorName}</strong><time title={new Date(message.created_at).toLocaleString('ru-RU')}>{new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></header>}
+                            {!grouped && <header><strong>{authorName}</strong><time data-tooltip={new Date(message.created_at).toLocaleString('ru-RU')}>{new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></header>}
                             {message.reply_to && <MessageReplyPreview replyTo={message.reply_to} onClick={() => document.getElementById(`nexo-channel-message-${message.reply_to!.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })} />}
                             {message.content && <MessageContent content={message.content} />}
                             {message.pin && <small className="message-pinned-label"><Pin size={11} />Закреплено</small>}
@@ -1453,7 +1467,7 @@ export function MessengerWorkspace({
               <div className="composer">
                 <label className="file-pill">
                   <Paperclip size={16} />
-                  <input
+                  <Input
                     type="file"
                     hidden
                     onChange={(event) => {
@@ -1462,8 +1476,8 @@ export function MessengerWorkspace({
                     }}
                   />
                 </label>
-                <button type="button" className="composer-code-button" title="Вставить блок кода" aria-label="Вставить блок кода" onClick={() => insertCodeBlock(true)}><Code size={16} /></button>
-                <textarea
+                <button type="button" className="composer-code-button" data-tooltip="Вставить блок кода" aria-label="Вставить блок кода" onClick={() => insertCodeBlock(true)}><Code size={16} /></button>
+                <Textarea
                   ref={channelComposerRef}
                   placeholder={`Сообщение #${activeChannel.name}`}
                   value={channelComposer}
@@ -1490,7 +1504,7 @@ export function MessengerWorkspace({
         </section>
         {showMembersPanel && (
           <aside className="channel-members-panel">
-            <header><strong>Участники</strong><button type="button" className="ghost-icon" aria-label="Закрыть участников" title="Закрыть" onClick={() => setShowMembersPanel(false)}><X size={15} /></button></header>
+            <header><strong>Участники</strong><button type="button" className="ghost-icon" aria-label="Закрыть участников" data-tooltip="Закрыть" onClick={() => setShowMembersPanel(false)}><X size={15} /></button></header>
             {membersLoading && <p className="muted">Загружаем участников…</p>}
             {membersError && <p className="status error">{membersError}</p>}
             {!membersLoading && !membersError && <div className="channel-member-list">
@@ -1534,7 +1548,7 @@ export function MessengerWorkspace({
           }} onPointerDown={(event) => event.stopPropagation()}>
             <div className="message-context-reactions" aria-label="Добавить реакцию">
               {['👍', '❤️', '😂', '😮', '😢', '🔥', '🎉', '👀'].map((emoji) => (
-                <button key={emoji} type="button" title={`Добавить реакцию ${emoji}`} onClick={() => void toggleMessageReaction(messageContext.message, messageContext.kind, emoji)}>{emoji}</button>
+                <button key={emoji} type="button" data-tooltip={`Добавить реакцию ${emoji}`} onClick={() => void toggleMessageReaction(messageContext.message, messageContext.kind, emoji)}>{emoji}</button>
               ))}
             </div>
             <button type="button" onClick={() => void toggleMessagePin(messageContext.message, messageContext.kind)}>
@@ -1591,9 +1605,9 @@ export function MessengerWorkspace({
               {ringtoneMuted ? 'Включить звук звонка' : 'Отключить звук звонка'}
             </button>
             <div className="incoming-call-actions">
-              <button type="button" className="call-reject" onClick={rejectIncomingCall} aria-label="Отклонить звонок" title="Отклонить"><PhoneOff size={20} /></button>
-              {incomingCall.mediaType === 'video' && <button type="button" className="call-accept call-accept-audio" onClick={() => void acceptIncomingCall('audio')} aria-label="Принять без видео" title="Принять без видео"><Phone size={18} /><small>Без видео</small></button>}
-              <button type="button" className="call-accept" onClick={() => void acceptIncomingCall()} aria-label="Принять звонок" title={callState ? 'Принять и завершить текущий' : 'Принять'}><Phone size={20} /></button>
+              <button type="button" className="call-reject" onClick={rejectIncomingCall} aria-label="Отклонить звонок" data-tooltip="Отклонить"><PhoneOff size={18} /><span>Отклонить</span></button>
+              {incomingCall.mediaType === 'video' && <button type="button" className="call-accept call-accept-audio" onClick={() => void acceptIncomingCall('audio')} aria-label="Принять без видео" title="Принять без видео"><Phone size={18} /><span>Без видео</span></button>}
+              <button type="button" className="call-accept" onClick={() => void acceptIncomingCall()} aria-label="Принять звонок" title={callState ? 'Принять и завершить текущий' : 'Принять'}><Phone size={18} /><span>Принять</span></button>
             </div>
           </motion.section>
         </motion.div>
@@ -1634,8 +1648,7 @@ function ServersRail({
           {server.icon ? <img src={server.icon} alt="" /> : (server.name[0] || '?').toUpperCase()}
         </button>
       ))}
-      <button type="button" className="server-circle ghost" onClick={onCreateServer}
-        title="Создать пространство" aria-label="Создать пространство"><Plus size={18} /></button>
+      <button type="button" className="server-circle ghost" onClick={onCreateServer} data-tooltip="Создать пространство" aria-label="Создать пространство"><Plus size={18} /></button>
     </aside>
   );
 }
@@ -1657,7 +1670,7 @@ function ServerSidebar({
     <>
       <div className="channel-header">
         {server.name}
-        <button type="button" className="ghost-icon" title="Настройки пространства" onClick={onOpenSettings}>
+        <button type="button" className="ghost-icon" data-tooltip="Настройки пространства" onClick={onOpenSettings}>
           <Settings size={16} />
         </button>
       </div>
@@ -1678,7 +1691,7 @@ function ServerSidebar({
       <div className="channel-group">
         <p className="group-title">голосовые</p>
         {voiceChannels.map((channel) => (
-          <div key={channel.id} className="channel voice channel-unavailable" title="Голосовая связь в сообществах ещё не подключена">
+          <div key={channel.id} className="channel voice channel-unavailable" data-tooltip="Голосовая связь в сообществах ещё не подключена">
             <Volume2 size={14} />{channel.name}<small>позже</small>
           </div>
         ))}
@@ -1753,8 +1766,7 @@ function MessageReactions({ reactions, userId, onToggle }: {
     <div className="message-reactions" aria-label="Реакции на сообщение">
       {reactions.map((reaction) => (
         <button key={reaction.emoji} type="button"
-          className={reaction.user_ids.includes(userId) ? 'message-reaction active' : 'message-reaction'}
-          title={reaction.user_ids.includes(userId) ? 'Убрать реакцию' : 'Добавить реакцию'}
+          className={reaction.user_ids.includes(userId) ? 'message-reaction active' : 'message-reaction'} data-tooltip={reaction.user_ids.includes(userId) ? 'Убрать реакцию' : 'Добавить реакцию'}
           onClick={() => onToggle(reaction.emoji)}>
           <span>{reaction.emoji}</span><small>{reaction.count}</small>
         </button>
@@ -1765,7 +1777,7 @@ function MessageReactions({ reactions, userId, onToggle }: {
 
 function MessageReplyPreview({ replyTo, onClick }: { replyTo: MessageReply; onClick: () => void }) {
   return (
-    <button type="button" className="message-reply-preview" onClick={onClick} title="Перейти к исходному сообщению">
+    <button type="button" className="message-reply-preview" onClick={onClick} data-tooltip="Перейти к исходному сообщению">
       <span className="message-reply-author">{replyTo.author.display_name || replyTo.author.username}</span>
       <span className="message-reply-content">{replyTo.content || 'Сообщение без текста'}</span>
     </button>
@@ -1784,7 +1796,7 @@ function MessageContent({ content }: { content: string }) {
     const code = blocks[index + 2];
     if (code !== undefined) {
       result.push(<div className="message-code-block" key={`code-${index}`}>
-        <header><span>{language || 'CODE'}</span><button type="button" title="Копировать код" aria-label="Копировать код"
+        <header><span>{language || 'CODE'}</span><button type="button" data-tooltip="Копировать код" aria-label="Копировать код"
           onClick={() => void copyText(code.trimEnd())}><Copy size={13} />Копировать</button></header>
         <pre><code>{code.replace(/\n$/, '')}</code></pre>
       </div>);
@@ -1825,26 +1837,54 @@ function CallOverlay({
 }) {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [remoteVolume, setRemoteVolume] = useState(1);
+  const [noiseSuppression, setNoiseSuppression] = useState(true);
+  const [tileSize, setTileSize] = useState<'compact' | 'comfortable' | 'large'>('comfortable');
   const [clock, setClock] = useState(Date.now());
   const peerName = peer?.display_name || peer?.username || 'Собеседник';
   const cameraTrack = state.localStream?.getVideoTracks()[0];
   const cameraEnabled = Boolean(cameraTrack?.enabled && !state.isScreenSharing);
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await overlayRef.current?.requestFullscreen?.();
+    } catch (error) { console.warn('Fullscreen call view is unavailable:', error); }
+  }
+  useEffect(() => {
+    const sync = () => setFullscreen(document.fullscreenElement === overlayRef.current);
+    document.addEventListener('fullscreenchange', sync);
+    return () => document.removeEventListener('fullscreenchange', sync);
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => setClock(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
   useEffect(() => {
+    state.localStream?.getAudioTracks().forEach((track) => { void track.applyConstraints({ noiseSuppression }).catch(() => {}); });
+  }, [state.localStream, noiseSuppression]);
+
+  useEffect(() => {
     if (localVideoRef.current && state.localStream) localVideoRef.current.srcObject = state.localStream;
   }, [state.localStream]);
   useEffect(() => {
     if (remoteVideoRef.current && state.remoteStream) remoteVideoRef.current.srcObject = state.remoteStream;
+    if (remoteAudioRef.current && state.remoteStream) remoteAudioRef.current.srcObject = state.remoteStream;
   }, [state.remoteStream]);
   useEffect(() => {
-    const video = remoteVideoRef.current as (HTMLVideoElement & { setSinkId?: (id: string) => Promise<void> }) | null;
-    if (video?.setSinkId && audioOutputId) void video.setSinkId(audioOutputId).catch((error) => console.warn('Audio output selection failed:', error));
+    const output = (remoteAudioRef.current || remoteVideoRef.current) as (HTMLMediaElement & { setSinkId?: (id: string) => Promise<void> }) | null;
+    if (output?.setSinkId && audioOutputId) void output.setSinkId(audioOutputId).catch((error) => console.warn('Audio output selection failed:', error));
   }, [audioOutputId, state.remoteStream]);
+
+  useEffect(() => {
+    if (remoteAudioRef.current) remoteAudioRef.current.volume = remoteVolume;
+    if (remoteVideoRef.current) remoteVideoRef.current.volume = remoteVolume;
+  }, [remoteVolume, state.remoteStream]);
 
   const total = Math.max(0, Math.floor((clock - state.startedAt) / 1000));
   const duration = `${Math.floor(total / 60).toString().padStart(2, '0')}:${(total % 60).toString().padStart(2, '0')}`;
@@ -1864,22 +1904,35 @@ function CallOverlay({
         <div className="call-banner-person connected"><Avatar user={currentUser} size={64} showStatus /><small>Вы</small></div>
         <div className={state.remoteStream ? 'call-banner-person connected' : 'call-banner-person pending'}><Avatar user={peer} size={64} showStatus /><small>{peerName}</small></div>
       </div>
-      <div className="call-banner-media">
-        {state.remoteStream && <video ref={remoteVideoRef} className={state.remoteStream.getVideoTracks().length ? '' : 'call-audio-sink'} autoPlay playsInline muted={deafened} />}
-        {!state.remoteStream?.getVideoTracks().length && <span>{state.remoteStream ? 'На связи' : 'Подключаемся…'}</span>}
+      {state.remoteStream && !state.remoteStream.getVideoTracks().length && <audio ref={remoteAudioRef} className="call-audio-sink" autoPlay playsInline muted={deafened} />}
+      {(state.remoteStream?.getVideoTracks().length || cameraTrack) ? <div className={`call-banner-media ${tileSize}`}>
+        {state.remoteStream?.getVideoTracks().length ? <video ref={remoteVideoRef} autoPlay playsInline muted={deafened} /> : null}
         {cameraTrack && <video ref={localVideoRef} className="call-local-preview" autoPlay playsInline muted />}
-      </div>
+      </div> : null}
       <div className="call-banner-controls">
-        <button type="button" className={micMuted ? 'call-control danger' : 'call-control'} onClick={onToggleMic} title={micMuted ? 'Включить микрофон' : 'Выключить микрофон'} aria-label={micMuted ? 'Включить микрофон' : 'Выключить микрофон'}>
-          {micMuted ? <MicOff size={17} /> : <Mic size={17} />}
-        </button>
-        <button type="button" className={cameraEnabled ? 'call-control' : 'call-control danger'} onClick={onToggleCamera}
-          disabled={!cameraTrack || state.isScreenSharing} title={cameraEnabled ? 'Выключить камеру' : 'Включить камеру'} aria-label={cameraEnabled ? 'Выключить камеру' : 'Включить камеру'}>
-          {cameraEnabled ? <Camera size={17} /> : <CameraOff size={17} />}
-        </button>
-        <button type="button" className="call-control" onClick={onShareScreen} title="Поделиться экраном" aria-label="Поделиться экраном"><Monitor size={17} /></button>
+        <div className="call-control-group">
+          <button type="button" className={micMuted ? 'call-control danger' : 'call-control'} onClick={onToggleMic} data-tooltip={micMuted ? 'Включить микрофон' : 'Выключить микрофон'} aria-label={micMuted ? 'Включить микрофон' : 'Выключить микрофон'}>
+            {micMuted ? <MicOff size={17} /> : <Mic size={17} />}
+          </button>
+          <button type="button" className={cameraEnabled ? 'call-control' : 'call-control danger'} onClick={onToggleCamera}
+            disabled={!cameraTrack || state.isScreenSharing} data-tooltip={cameraEnabled ? 'Выключить камеру' : 'Включить камеру'} aria-label={cameraEnabled ? 'Выключить камеру' : 'Включить камеру'}>
+            {cameraEnabled ? <Camera size={17} /> : <CameraOff size={17} />}
+          </button>
+        </div>
+        <div className="call-control-group">
+          <button type="button" className="call-control" onClick={onShareScreen} data-tooltip="Поделиться экраном" aria-label="Поделиться экраном"><Monitor size={17} /></button>
+          <div className="call-more-wrap">
+            <button type="button" className="call-control" onClick={() => setMoreOpen((value) => !value)} data-tooltip="Дополнительные настройки" aria-label="Дополнительные настройки"><MoreHorizontal size={17} /></button>
+            {moreOpen && <div className="call-more-popover">
+              <div><span>Шумоподавление</span><Switch checked={noiseSuppression} onChange={setNoiseSuppression} label="Шумоподавление" /></div>
+              <Slider label="Громкость собеседника" min={0} max={1} step={0.05} value={remoteVolume} valueLabel={`${Math.round(remoteVolume * 100)}%`} onChange={setRemoteVolume} />
+              <label><span>Размер плитки</span><Select value={tileSize} onChange={(event) => setTileSize(event.target.value as typeof tileSize)}><option value="compact">Компактный</option><option value="comfortable">Обычный</option><option value="large">Крупный</option></Select></label>
+            </div>}
+          </div>
+          <button type="button" className="call-control" onClick={() => void toggleFullscreen()} title={fullscreen ? 'Свернуть звонок' : 'Развернуть звонок'} aria-label={fullscreen ? 'Свернуть звонок' : 'Развернуть звонок'}>{fullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}</button>
+          <button type="button" className="call-control" onClick={() => setCollapsed(true)} title="Свернуть панель звонка" aria-label="Свернуть панель звонка"><ChevronUp size={17} /></button>
+        </div>
         <button type="button" className="call-control call-hangup" onClick={() => onHangUp(true)} title="Завершить звонок" aria-label="Завершить звонок"><PhoneOff size={17} /></button>
-        <button type="button" className="call-control" onClick={() => setCollapsed(true)} title="Свернуть панель звонка" aria-label="Свернуть панель звонка"><ChevronUp size={17} /></button>
       </div>
       <span className="call-banner-duration">{duration}</span>
     </motion.section>
@@ -1922,7 +1975,7 @@ function CreateServerModal({
         <form className="modal-form" onSubmit={handleSubmit}>
           <label>
             <span>Название</span>
-            <input
+            <Input
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="Например, Orbit Studio"
@@ -1933,7 +1986,7 @@ function CreateServerModal({
           </label>
           <label>
             <span>Описание</span>
-            <textarea
+            <Textarea
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="Для команды, сообщества или друзей."

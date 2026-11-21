@@ -2,7 +2,7 @@ export type SoundKind =
   | 'message' | 'send' | 'outgoing-ring' | 'ring'
   | 'call-accepted' | 'call-ended'
   | 'mic-on' | 'mic-off' | 'headphones-on' | 'headphones-off'
-  | 'notification' | 'error';
+  | 'notification' | 'error' | 'voice-join' | 'voice-leave' | 'voice-user-join' | 'voice-user-leave';
 
 export type NexoSoundPreferences = {
   enabled: boolean;
@@ -24,7 +24,11 @@ export const NEXO_SOUND_EVENTS: Array<{ key: SoundKind; label: string; descripti
   { key: 'headphones-on', label: 'Звук включён', description: 'Низкий сигнал включения вывода' },
   { key: 'headphones-off', label: 'Звук выключен', description: 'Низкий сигнал отключения вывода' },
   { key: 'notification', label: 'Уведомление и упоминание', description: 'Две ноты вверх' },
-  { key: 'error', label: 'Ошибка', description: 'Один спокойный низкий тон' }
+  { key: 'error', label: 'Ошибка', description: 'Один спокойный низкий тон' },
+  { key: 'voice-join', label: 'Вход в голосовой канал', description: 'Короткая восходящая пара нот' },
+  { key: 'voice-leave', label: 'Выход из голосового канала', description: 'Короткая нисходящая пара нот' },
+  { key: 'voice-user-join', label: 'Участник подключился', description: 'Тихий сигнал появления участника' },
+  { key: 'voice-user-leave', label: 'Участник отключился', description: 'Тихий сигнал выхода участника' }
 ];
 
 const STORAGE_KEY = 'nexo.sound-preferences.v2';
@@ -33,7 +37,8 @@ const DEFAULT_EVENTS: Record<SoundKind, boolean> = {
   message: true, send: true, 'outgoing-ring': true, ring: true,
   'call-accepted': true, 'call-ended': true,
   'mic-on': true, 'mic-off': true, 'headphones-on': true, 'headphones-off': true,
-  notification: true, error: true
+  notification: true, error: true, 'voice-join': true, 'voice-leave': true,
+  'voice-user-join': true, 'voice-user-leave': true
 };
 const DEFAULTS: NexoSoundPreferences = {
   enabled: true,
@@ -115,7 +120,7 @@ installUnlockListeners();
 type SoundNote = { frequency: number; at: number; duration: number; gain: number; wave?: OscillatorType };
 
 // All pitches belong to the C-major pentatonic family: C, D, E, G and A.
-const C = 261.63, D = 293.66, E = 329.63, G = 392, A = 440, C5 = 523.25, D5 = 587.33, E5 = 659.25;
+const C = 261.63, D = 293.66, E = 329.63, G = 392, A = 440, C5 = 523.25, D5 = 587.33, E5 = 659.25, G5 = 783.99;
 const patterns: Record<SoundKind, SoundNote[]> = {
   message: [{ frequency: E5, at: 0, duration: .13, gain: .16 }, { frequency: C5, at: .15, duration: .16, gain: .13 }],
   send: [{ frequency: G, at: 0, duration: .075, gain: .075 }],
@@ -134,7 +139,11 @@ const patterns: Record<SoundKind, SoundNote[]> = {
   'headphones-on': [{ frequency: C, at: 0, duration: .11, gain: .12 }, { frequency: E, at: .13, duration: .14, gain: .12 }],
   'headphones-off': [{ frequency: E, at: 0, duration: .11, gain: .11 }, { frequency: C, at: .13, duration: .14, gain: .11 }],
   notification: [{ frequency: G, at: 0, duration: .12, gain: .14 }, { frequency: C5, at: .15, duration: .16, gain: .15 }],
-  error: [{ frequency: C, at: 0, duration: .2, gain: .13 }]
+  error: [{ frequency: C, at: 0, duration: .2, gain: .13 }],
+  'voice-join': [{ frequency: D, at: 0, duration: .1, gain: .11 }, { frequency: G, at: .12, duration: .13, gain: .12 }],
+  'voice-leave': [{ frequency: G, at: 0, duration: .1, gain: .11 }, { frequency: D, at: .12, duration: .13, gain: .11 }],
+  'voice-user-join': [{ frequency: E5, at: 0, duration: .09, gain: .08 }, { frequency: G5, at: .1, duration: .1, gain: .09 }],
+  'voice-user-leave': [{ frequency: G5, at: 0, duration: .09, gain: .08 }, { frequency: E5, at: .1, duration: .1, gain: .08 }]
 };
 
 function scheduleSoundPattern(audio: AudioContext, kind: SoundKind, volume: number): void {

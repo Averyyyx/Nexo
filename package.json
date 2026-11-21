@@ -1,13 +1,13 @@
 {
   "name": "nexo",
-  "version": "0.0.7-alpha",
+  "version": "0.0.8-alpha",
   "description": "A desktop communication and collaboration space for people and teams.",
   "main": "electron/main.js",
   "scripts": {
     "dev": "node server.js",
     "dev:client": "cd client && npm run dev",
     "start": "electron .",
-    "test": "node --check server.js && node --check electron/main.js && node --check electron/preload.js && node --check electron/splash-preload.js && node --test electron/version.test.js electron/email-validation.test.js electron/deeplink.test.js electron/windows-icon.test.js electron/ui-font-size.test.js",
+    "test": "node --check server.js && node --check electron/main.js && node --check electron/preload.js && node --check electron/splash-preload.js && node --test electron/version.test.js electron/email-validation.test.js electron/deeplink.test.js electron/windows-icon.test.js electron/ui-font-size.test.js electron/dev-account-seed.test.js electron/splash-window.test.js electron/dock-layout.test.js electron/form-controls.test.js",
     "build:client": "npm run build --prefix client",
     "prepare:public": "node scripts/prepare-public.js",
     "build:app": "npm run build:client && npm run prepare:public",
